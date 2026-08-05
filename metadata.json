@@ -1,0 +1,6 @@
+{
+  "name": "Read Rabbit",
+  "description": "A cozy, academic study burrow with curated curriculum roadmaps, subjects, interactive study materials, and an AI-powered study companion.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
