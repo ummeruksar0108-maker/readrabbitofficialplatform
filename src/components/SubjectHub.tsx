@@ -663,7 +663,7 @@ export default function SubjectHub({
 
     setIsUploadingFile(true);
     console.log(`[UPLOAD FILE SELECTED] Name: ${file.name}, Size: ${file.size} bytes, Type: ${file.type}`);
-    setUploadSuccess(`⏳ Step 1/2: Uploading "${file.name}" to Supabase Cloud Storage...`);
+    setUploadSuccess(`⏳ 10% - Preparing "${file.name}" for upload...`);
 
     let cloudRes: UploadResult | null = null;
     try {
@@ -676,8 +676,8 @@ export default function SubjectHub({
           subjectId: subject.id,
           unitId: targetUnitId || "subject_general"
         },
-        (_pct, statusMsg) => {
-          setUploadSuccess(`⏳ Step 1/2: ${statusMsg}`);
+        (pct, statusMsg) => {
+          setUploadSuccess(`⏳ ${pct}% - ${statusMsg}`);
         }
       );
       console.log("[STORAGE UPLOAD SUCCESS] Public URL:", cloudRes.publicUrl);
@@ -686,7 +686,7 @@ export default function SubjectHub({
       console.log(`[SUPABASE DB METADATA SAVE] Inserting metadata row into 'study_materials': ${logCoordinates}`);
       logDiagnostic("info", `[SUPABASE DB METADATA SAVE] ${logCoordinates}`);
 
-      setUploadSuccess(`⏳ Step 2/2: Inserting metadata row into Supabase PostgreSQL 'study_materials' table...`);
+      setUploadSuccess(`⏳ 90% - Saving material metadata to database...`);
 
       // 2. Insert metadata into Supabase PostgreSQL table 'study_materials'
       try {
@@ -756,7 +756,7 @@ export default function SubjectHub({
       }
 
       setLastUploadedMaterialName(cloudRes.name);
-      setUploadSuccess(`✅ "${cloudRes.name}" successfully uploaded to Supabase Storage and metadata saved to Supabase study_materials table! Synced across all devices.`);
+      setUploadSuccess(`✅ 100% - "${cloudRes.name}" successfully uploaded and saved! Synced across all devices.`);
     } catch (err: any) {
       console.error("[UPLOAD / SUPABASE DB INSERT FAIL]", err);
       const exactError = err?.message || String(err);

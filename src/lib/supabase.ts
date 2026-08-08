@@ -291,7 +291,7 @@ export async function uploadFileToSupabaseStorage(
   const fileId = "mat_sb_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
 
   logDiagnostic("info", `[Supabase Storage] Uploading "${file.name}" (${formattedSize}) to bucket 'study-materials' at '${cloudPath}'...`);
-  if (onProgress) onProgress(20, `Uploading file to Supabase Storage bucket 'study-materials'...`);
+  if (onProgress) onProgress(25, `Uploading "${file.name}" to Supabase Storage...`);
 
   const { error } = await supabase.storage
     .from('study-materials')
@@ -312,7 +312,7 @@ export async function uploadFileToSupabaseStorage(
     throw new Error(`Supabase Storage Upload Failed: ${error.message}`);
   }
 
-  if (onProgress) onProgress(85, `Uploaded! Generating public URL...`);
+  if (onProgress) onProgress(75, `Storage upload complete! Generating URL...`);
 
   const { data: publicUrlData } = supabase.storage
     .from('study-materials')
@@ -325,7 +325,7 @@ export async function uploadFileToSupabaseStorage(
   }
 
   logDiagnostic("success", `[Supabase Upload Success] Public URL: ${publicUrl}`);
-  if (onProgress) onProgress(100, `Upload complete!`);
+  if (onProgress) onProgress(85, `Public URL ready!`);
 
   return {
     id: fileId,
