@@ -15,7 +15,7 @@ import AdminPortal from "./components/AdminPortal";
 import AddSubjectModal from "./components/AddSubjectModal";
 import FirebaseDiagnosticsPanel from "./components/FirebaseDiagnosticsPanel";
 import { Logo } from "./components/Logo";
-import { logDiagnostic } from "./lib/firebase";
+import { logDiagnostic, saveCoursesToFirestore, loadCoursesFromFirestore } from "./lib/firebase";
 import { supabase, fetchAllMaterialsFromSupabaseDB, mergeSupabaseMaterialsIntoCourses } from "./lib/supabase";
 
 // Icons for Responsive Top Bar
@@ -202,19 +202,22 @@ export default function App() {
   const isFetchingFromServer = useRef(false);
   const lastLocalMutationTime = useRef<number>(0);
 
-  // Helper function to save curriculum structure locally and to server disk
+  // Helper function to save curriculum structure locally, to Express server, and Firestore DB
   const saveCurriculumToServer = async (coursesToSave: Course[]): Promise<boolean> => {
     lastLocalMutationTime.current = Date.now();
     try {
       localStorage.setItem(CURRICULUM_STORAGE_KEY, JSON.stringify(coursesToSave));
       setLastSyncSuccessTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
 
-      // Save curriculum structure to server disk asynchronously so other devices load it
+      // 1. Save curriculum structure to Express server disk
       fetch("/api/curriculum", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ courses: coursesToSave }),
       }).catch((err) => console.warn("[API CURRICULUM POST WARN]", err));
+
+      // 2. Dual-save to Firestore Cloud DB for instant cross-device synchronization
+      saveCoursesToFirestore(coursesToSave).catch((err) => console.warn("[FIRESTORE CLOUD SAVE WARN]", err));
 
       return true;
     } catch (e) {
@@ -223,42 +226,52 @@ export default function App() {
     }
   };
 
-  // Helper function to fetch latest curriculum from local storage & Supabase PostgreSQL DB
+  // Helper function to fetch latest curriculum from Express server, Firestore DB & Supabase PostgreSQL
   const fetchCurriculumFromServer = async (isManualCall = false) => {
     if (isManualCall) setIsSyncingServer(true);
     isFetchingFromServer.current = true;
     try {
-      // 1. First attempt to load server-persisted curriculum json from /api/curriculum
       let baseCourses: Course[] = initialCourses;
+      let loadedFromCloud = false;
+
+      // 1. Try Express server disk file with cache-busting query timestamp
       try {
-        const res = await fetch("/api/curriculum");
+        const res = await fetch("/api/curriculum?t=" + Date.now(), { cache: "no-store" });
         if (res.ok) {
           const serverData = await res.json();
           if (serverData && hasAllDefaultCourses(serverData)) {
             baseCourses = serverData as Course[];
-            // Sync local storage with latest server data
-            localStorage.setItem(CURRICULUM_STORAGE_KEY, JSON.stringify(baseCourses));
-          } else {
-            const saved = localStorage.getItem(CURRICULUM_STORAGE_KEY);
-            if (saved) {
-              const parsed: unknown = JSON.parse(saved);
-              if (hasAllDefaultCourses(parsed)) {
-                baseCourses = parsed as Course[];
-              }
-            }
+            loadedFromCloud = true;
           }
         }
       } catch (e) {
         console.warn("[SERVER CURRICULUM FETCH WARN]", e);
+      }
+
+      // 2. Try Firestore Cloud Database if server disk did not provide customized structure
+      if (!loadedFromCloud) {
+        try {
+          const firestoreCourses = await loadCoursesFromFirestore();
+          if (firestoreCourses && hasAllDefaultCourses(firestoreCourses)) {
+            baseCourses = firestoreCourses as Course[];
+            loadedFromCloud = true;
+          }
+        } catch (e) {
+          console.warn("[FIRESTORE FETCH WARN]", e);
+        }
+      }
+
+      // 3. Fallback to LocalStorage snapshot if cloud fetches failed
+      if (!loadedFromCloud) {
         const saved = localStorage.getItem(CURRICULUM_STORAGE_KEY);
         if (saved) {
           try {
-            const parsed: unknown = JSON.parse(saved);
+            const parsed = JSON.parse(saved);
             if (hasAllDefaultCourses(parsed)) {
               baseCourses = parsed as Course[];
             }
-          } catch (err) {
-            console.warn("[CURRICULUM PARSE WARN]", err);
+          } catch (e) {
+            console.warn("[LOCALSTORAGE FETCH WARN]", e);
           }
         }
       }
@@ -266,8 +279,10 @@ export default function App() {
       // Supabase PostgreSQL table 'study_materials' is the single source of truth for uploaded materials
       const supabaseMaterials = await fetchAllMaterialsFromSupabaseDB();
       const mergedCourses = mergeSupabaseMaterialsIntoCourses(baseCourses, supabaseMaterials);
+      const finalCourses = ensureAllLanguageCardsExist(mergedCourses);
 
-      setCourses(ensureAllLanguageCardsExist(mergedCourses));
+      setCourses(finalCourses);
+      localStorage.setItem(CURRICULUM_STORAGE_KEY, JSON.stringify(finalCourses));
 
       setLastSyncSuccessTime(
         new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -283,9 +298,35 @@ export default function App() {
     }
   };
 
-  // Load initial curriculum state on component mount
+  // Load initial curriculum state and establish auto-sync polling + tab focus listeners
   useEffect(() => {
     fetchCurriculumFromServer();
+
+    const handleSyncOnFocus = () => {
+      // Only fetch from cloud if user hasn't made a local edit in the last 5 seconds
+      if (Date.now() - lastLocalMutationTime.current > 5000) {
+        fetchCurriculumFromServer();
+      }
+    };
+
+    window.addEventListener("focus", handleSyncOnFocus);
+    const handleVisChange = () => {
+      if (document.visibilityState === "visible") {
+        handleSyncOnFocus();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisChange);
+
+    // Auto-poll every 12 seconds for seamless multi-device updates
+    const pollInterval = setInterval(() => {
+      handleSyncOnFocus();
+    }, 12000);
+
+    return () => {
+      window.removeEventListener("focus", handleSyncOnFocus);
+      document.removeEventListener("visibilitychange", handleVisChange);
+      clearInterval(pollInterval);
+    };
   }, []);
 
   // Persist State Changes to Server and Local Storage
@@ -767,8 +808,18 @@ export default function App() {
             </div>
           </div>
 
-          {/* Quick AI Search & Profile */}
-          <div className="flex items-center gap-4">
+          {/* Quick AI Search & Cloud Sync & Notifications */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => fetchCurriculumFromServer(true)}
+              disabled={isSyncingServer}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fff2e1] hover:bg-[#f8e6cb] text-[#95491a] rounded-xl border border-[#dac1c1]/40 text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+              title="Sync latest curriculum from cloud"
+            >
+              <RefreshCw size={14} className={`text-[#95491a] ${isSyncingServer ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">{isSyncingServer ? "Syncing..." : "Sync Cloud"}</span>
+            </button>
+
             <div className="hidden sm:flex items-center gap-2 bg-[#fff2e1]/60 px-3 py-1.5 rounded-xl border border-[#dac1c1]/40 focus-within:border-[#fd9b65] transition-colors max-w-xs">
               <Search size={16} className="text-[#877272]" />
               <input
