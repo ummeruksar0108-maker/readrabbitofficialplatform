@@ -202,12 +202,20 @@ export default function App() {
   const isFetchingFromServer = useRef(false);
   const lastLocalMutationTime = useRef<number>(0);
 
-  // Helper function to save curriculum structure locally
+  // Helper function to save curriculum structure locally and to server disk
   const saveCurriculumToServer = async (coursesToSave: Course[]): Promise<boolean> => {
     lastLocalMutationTime.current = Date.now();
     try {
       localStorage.setItem(CURRICULUM_STORAGE_KEY, JSON.stringify(coursesToSave));
       setLastSyncSuccessTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+
+      // Save curriculum structure to server disk asynchronously so other devices load it
+      fetch("/api/curriculum", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courses: coursesToSave }),
+      }).catch((err) => console.warn("[API CURRICULUM POST WARN]", err));
+
       return true;
     } catch (e) {
       console.warn("[LOCALSTORAGE SAVE WARN]", e);
@@ -220,17 +228,38 @@ export default function App() {
     if (isManualCall) setIsSyncingServer(true);
     isFetchingFromServer.current = true;
     try {
-      const saved = localStorage.getItem(CURRICULUM_STORAGE_KEY);
+      // 1. First attempt to load server-persisted curriculum json from /api/curriculum
       let baseCourses: Course[] = initialCourses;
-
-      if (saved) {
-        try {
-          const parsed: unknown = JSON.parse(saved);
-          if (hasAllDefaultCourses(parsed)) {
-            baseCourses = parsed as Course[];
+      try {
+        const res = await fetch("/api/curriculum");
+        if (res.ok) {
+          const serverData = await res.json();
+          if (serverData && hasAllDefaultCourses(serverData)) {
+            baseCourses = serverData as Course[];
+            // Sync local storage with latest server data
+            localStorage.setItem(CURRICULUM_STORAGE_KEY, JSON.stringify(baseCourses));
+          } else {
+            const saved = localStorage.getItem(CURRICULUM_STORAGE_KEY);
+            if (saved) {
+              const parsed: unknown = JSON.parse(saved);
+              if (hasAllDefaultCourses(parsed)) {
+                baseCourses = parsed as Course[];
+              }
+            }
           }
-        } catch (e) {
-          console.warn("[CURRICULUM PARSE WARN]", e);
+        }
+      } catch (e) {
+        console.warn("[SERVER CURRICULUM FETCH WARN]", e);
+        const saved = localStorage.getItem(CURRICULUM_STORAGE_KEY);
+        if (saved) {
+          try {
+            const parsed: unknown = JSON.parse(saved);
+            if (hasAllDefaultCourses(parsed)) {
+              baseCourses = parsed as Course[];
+            }
+          } catch (err) {
+            console.warn("[CURRICULUM PARSE WARN]", err);
+          }
         }
       }
 
