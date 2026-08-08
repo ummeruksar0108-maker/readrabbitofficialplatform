@@ -33,7 +33,7 @@ export default function CurriculumRoadmap({ courses, activeCourseId, onSelectSem
             Curriculum Roadmap
           </h2>
           <p className="text-[#2A1C18] text-sm md:text-base max-w-2xl font-sans leading-relaxed">
-            Organize your academic journey. Browse and choose a semester across our specialized courses to explore classes, study custom flashcards, and review master topics.
+            We really shouldn't have to tell college students how to use a basic website, right? Pick your course, click a semester, and actually study for once. It's literally dummy-proof.
           </p>
         </div>
         {onUnlockAll && hasLockedSemesters && (
