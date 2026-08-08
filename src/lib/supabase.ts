@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { logDiagnostic } from "./firebase";
+import { Course, StudyMaterial } from "../types";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
@@ -360,3 +361,151 @@ export async function deleteFileFromSupabaseStorage(cloudPath: string): Promise<
     return false;
   }
 }
+
+/**
+ * Merges uploaded study material records from Supabase DB into the base curriculum structure.
+ * Supabase 'study_materials' table is the primary source of truth across all devices.
+ */
+export function mergeSupabaseMaterialsIntoCourses(
+  baseCourses: Course[],
+  supabaseMaterials: UploadResult[]
+): Course[] {
+  if (!baseCourses || !Array.isArray(baseCourses)) return baseCourses;
+
+  // Clone base courses to avoid direct mutation
+  const coursesCopy: Course[] = JSON.parse(JSON.stringify(baseCourses));
+
+  if (!supabaseMaterials || !Array.isArray(supabaseMaterials) || supabaseMaterials.length === 0) {
+    return coursesCopy;
+  }
+
+  // Set of valid identifiers present in Supabase DB for uploaded materials
+  const validSupabaseIds = new Set(supabaseMaterials.map(m => m.id).filter(Boolean));
+  const validSupabaseCloudPaths = new Set(supabaseMaterials.map(m => m.cloudPath).filter(Boolean));
+  const validSupabaseUrls = new Set(supabaseMaterials.map(m => m.publicUrl).filter(Boolean));
+
+  const isCloudMaterial = (m: StudyMaterial) => Boolean(m.cloudPath || (m.publicUrl && m.publicUrl.includes("supabase")));
+
+  const isMaterialValidInSupabase = (m: StudyMaterial) => {
+    if (!isCloudMaterial(m)) return true;
+    if (m.id && validSupabaseIds.has(m.id)) return true;
+    if (m.cloudPath && validSupabaseCloudPaths.has(m.cloudPath)) return true;
+    if (m.publicUrl && validSupabaseUrls.has(m.publicUrl)) return true;
+    return false;
+  };
+
+  // Clean stale uploaded materials that were deleted from Supabase
+  for (const course of coursesCopy) {
+    for (const sem of course.semesters) {
+      for (const subject of sem.subjects) {
+        if (subject.materials) {
+          subject.materials = subject.materials.filter(isMaterialValidInSupabase);
+        }
+        if (subject.textbooks) {
+          subject.textbooks = subject.textbooks.filter(isMaterialValidInSupabase);
+        }
+        for (const unit of subject.units) {
+          if (unit.materials) {
+            unit.materials = unit.materials.filter(isMaterialValidInSupabase);
+          }
+        }
+      }
+    }
+  }
+
+  // Merge each material from Supabase DB into the appropriate location
+  for (const mat of supabaseMaterials) {
+    if (!mat.publicUrl) continue;
+
+    const matItem: StudyMaterial = {
+      id: mat.id || `supa_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      name: mat.name || "Uploaded Document",
+      size: mat.size || "PDF Document",
+      addedTime: "Uploaded by Admin",
+      type: mat.type || "pdf",
+      isBookmarked: false,
+      tag: mat.unitId === "textbook" ? "Prescribed Textbook" : mat.unitId ? "Unit File" : "Subject File",
+      details: mat.publicUrl,
+      cloudPath: mat.cloudPath,
+      publicUrl: mat.publicUrl,
+      uploadedAt: mat.uploadedAt || new Date().toISOString(),
+      courseId: mat.courseId,
+      semesterId: mat.semesterId,
+      subjectId: mat.subjectId,
+      unitId: mat.unitId
+    };
+
+    const isSameMaterial = (existing: StudyMaterial) => {
+      if (matItem.id && existing.id === matItem.id) return true;
+      if (matItem.cloudPath && existing.cloudPath && existing.cloudPath === matItem.cloudPath) return true;
+      if (matItem.publicUrl && existing.publicUrl && existing.publicUrl === matItem.publicUrl) return true;
+      return false;
+    };
+
+    for (const course of coursesCopy) {
+      if (mat.courseId && course.id !== mat.courseId) {
+        const belongs = course.semesters.some(s => s.subjects.some(sub => sub.id === mat.subjectId));
+        if (!belongs) continue;
+      }
+
+      for (const sem of course.semesters) {
+        if (mat.semesterId && String(sem.id) !== String(mat.semesterId)) {
+          const belongs = sem.subjects.some(sub => sub.id === mat.subjectId);
+          if (!belongs) continue;
+        }
+
+        for (const subject of sem.subjects) {
+          if (subject.id === mat.subjectId) {
+            if (mat.unitId === "textbook") {
+              subject.textbooks = subject.textbooks || [];
+              const tbIdx = subject.textbooks.findIndex(isSameMaterial);
+              if (tbIdx >= 0) {
+                subject.textbooks[tbIdx] = { ...subject.textbooks[tbIdx], ...matItem };
+              } else {
+                subject.textbooks.push(matItem);
+              }
+
+              subject.materials = subject.materials || [];
+              const mIdx = subject.materials.findIndex(isSameMaterial);
+              if (mIdx >= 0) {
+                subject.materials[mIdx] = { ...subject.materials[mIdx], ...matItem };
+              } else {
+                subject.materials.push(matItem);
+              }
+            } else if (mat.unitId) {
+              const targetUnit = subject.units.find(u => u.id === mat.unitId);
+              if (targetUnit) {
+                targetUnit.materials = targetUnit.materials || [];
+                const uIdx = targetUnit.materials.findIndex(isSameMaterial);
+                if (uIdx >= 0) {
+                  targetUnit.materials[uIdx] = { ...targetUnit.materials[uIdx], ...matItem };
+                } else {
+                  targetUnit.materials.push(matItem);
+                }
+              } else {
+                subject.materials = subject.materials || [];
+                const mIdx = subject.materials.findIndex(isSameMaterial);
+                if (mIdx >= 0) {
+                  subject.materials[mIdx] = { ...subject.materials[mIdx], ...matItem };
+                } else {
+                  subject.materials.push(matItem);
+                }
+              }
+            } else {
+              subject.materials = subject.materials || [];
+              const mIdx = subject.materials.findIndex(isSameMaterial);
+              if (mIdx >= 0) {
+                subject.materials[mIdx] = { ...subject.materials[mIdx], ...matItem };
+              } else {
+                subject.materials.push(matItem);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return coursesCopy;
+}
+

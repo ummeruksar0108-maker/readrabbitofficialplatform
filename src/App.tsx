@@ -16,7 +16,7 @@ import AddSubjectModal from "./components/AddSubjectModal";
 import FirebaseDiagnosticsPanel from "./components/FirebaseDiagnosticsPanel";
 import { Logo } from "./components/Logo";
 import { logDiagnostic } from "./lib/firebase";
-import { supabase } from "./lib/supabase";
+import { supabase, fetchAllMaterialsFromSupabaseDB, mergeSupabaseMaterialsIntoCourses } from "./lib/supabase";
 
 // Icons for Responsive Top Bar
 import { Menu, Search, X, Sparkles, Layers, ShieldCheck, Settings, HelpCircle, Bell, BookOpen, RefreshCw, ArrowLeft, LogOut, Palette, Check } from "lucide-react";
@@ -215,28 +215,30 @@ export default function App() {
     }
   };
 
-  // Helper function to fetch latest curriculum from local storage
+  // Helper function to fetch latest curriculum from local storage & Supabase PostgreSQL DB
   const fetchCurriculumFromServer = async (isManualCall = false) => {
     if (isManualCall) setIsSyncingServer(true);
     isFetchingFromServer.current = true;
     try {
       const saved = localStorage.getItem(CURRICULUM_STORAGE_KEY);
+      let baseCourses: Course[] = initialCourses;
 
-      if (!saved) {
-        setCourses(initialCourses);
-        return;
+      if (saved) {
+        try {
+          const parsed: unknown = JSON.parse(saved);
+          if (hasAllDefaultCourses(parsed)) {
+            baseCourses = parsed as Course[];
+          }
+        } catch (e) {
+          console.warn("[CURRICULUM PARSE WARN]", e);
+        }
       }
 
-      const parsed: unknown = JSON.parse(saved);
+      // Supabase PostgreSQL table 'study_materials' is the single source of truth for uploaded materials
+      const supabaseMaterials = await fetchAllMaterialsFromSupabaseDB();
+      const mergedCourses = mergeSupabaseMaterialsIntoCourses(baseCourses, supabaseMaterials);
 
-      if (hasAllDefaultCourses(parsed)) {
-        setCourses(parsed);
-      } else {
-        // A stale snapshot is overriding data.ts and hiding one or more courses.
-        // Replace it with the complete default curriculum.
-        localStorage.setItem(CURRICULUM_STORAGE_KEY, JSON.stringify(initialCourses));
-        setCourses(initialCourses);
-      }
+      setCourses(mergedCourses);
 
       setLastSyncSuccessTime(
         new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
