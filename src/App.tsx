@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { initialCourses } from "./data";
+import { initialCourses, ensureAllLanguageCardsExist } from "./data";
 import { Course, Subject, Semester, Unit, StudyMaterial } from "./types";
 
 // Import Components
@@ -23,7 +23,7 @@ import { Menu, Search, X, Sparkles, Layers, ShieldCheck, Settings, HelpCircle, B
 import { bgPresets } from "./components/ExtraTabs";
 
 
-const CURRICULUM_STORAGE_KEY = "read_rabbit_curriculum_v5";
+const CURRICULUM_STORAGE_KEY = "read_rabbit_curriculum_v6";
 
 const hasAllDefaultCourses = (value: unknown): value is Course[] => {
   if (!Array.isArray(value)) return false;
@@ -57,7 +57,7 @@ export default function App() {
   const [courses, setCourses] = useState<Course[]>(() => {
     const saved = localStorage.getItem(CURRICULUM_STORAGE_KEY);
 
-    if (!saved) return initialCourses;
+    if (!saved) return ensureAllLanguageCardsExist(initialCourses);
 
     try {
       const parsed: unknown = JSON.parse(saved);
@@ -66,13 +66,13 @@ export default function App() {
       // such as BCA DS, and restore the complete curriculum from data.ts.
       if (!hasAllDefaultCourses(parsed)) {
         localStorage.removeItem(CURRICULUM_STORAGE_KEY);
-        return initialCourses;
+        return ensureAllLanguageCardsExist(initialCourses);
       }
 
-      return parsed;
+      return ensureAllLanguageCardsExist(parsed as Course[]);
     } catch {
       localStorage.removeItem(CURRICULUM_STORAGE_KEY);
-      return initialCourses;
+      return ensureAllLanguageCardsExist(initialCourses);
     }
   });
 
@@ -238,7 +238,7 @@ export default function App() {
       const supabaseMaterials = await fetchAllMaterialsFromSupabaseDB();
       const mergedCourses = mergeSupabaseMaterialsIntoCourses(baseCourses, supabaseMaterials);
 
-      setCourses(mergedCourses);
+      setCourses(ensureAllLanguageCardsExist(mergedCourses));
 
       setLastSyncSuccessTime(
         new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
