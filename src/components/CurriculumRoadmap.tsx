@@ -155,7 +155,17 @@ export default function CurriculumRoadmap({ courses, activeCourseId, onSelectSem
       <div className="mt-16 pt-8 border-t border-[#E2D4C3] flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-sans text-[#735E55]">
         <div className="flex flex-col gap-1">
           <span>Read Rabbit Syllabus & Peer-Certified Materials • Study Sprint ☕</span>
-          <span className="text-[#D97706] font-medium">Created with ☕ & 🍯 by <strong className="text-[#1E1412]">Umme Ruksar</strong> & <strong className="text-[#1E1412]">Balaji C</strong></span>
+          <span className="text-[#D97706] font-medium">
+            Created with ☕ & 🍯 by <strong className="text-[#1E1412]">Umme Ruksar</strong> &{" "}
+            <a
+              href="https://www.instagram.com/_bharatvanshi"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#1E1412] font-bold hover:text-[#95491a] transition-colors cursor-pointer"
+            >
+              Balaji C
+            </a>
+          </span>
         </div>
         {onOpenAdminPortal && (
           <button

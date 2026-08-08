@@ -1030,6 +1030,7 @@ export default function App() {
                 pushAppHistory(selectedCourseId, targetSemId, null, "subjects");
               }}
               onUpdateSubject={handleUpdateSubject}
+              onSendNotification={handleSendNotification}
             />
           )}
 

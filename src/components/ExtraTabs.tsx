@@ -207,76 +207,7 @@ export default function ExtraTabs({
             </div>
           </div>
 
-          {/* Website Background Customizer */}
-          <div className="space-y-4 pt-6 border-t border-[#dac1c1]/30">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Palette size={18} className="text-[#D97706]" />
-                <h3 className="font-bold text-[#1E1412] text-sm tracking-wider uppercase">Website Background Theme</h3>
-              </div>
-              <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-[#F4ECE1] text-[#1E1412] border border-[#E2D4C3]">
-                {bgColor.toUpperCase()}
-              </span>
-            </div>
 
-            <p className="text-xs text-[#735E55]">
-              Choose a preset background hue or select any custom HEX color for the entire website layout.
-            </p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {bgPresets.map((preset) => {
-                const isSelected = bgColor.toLowerCase() === preset.hex.toLowerCase();
-                return (
-                  <button
-                    type="button"
-                    key={preset.id}
-                    onClick={() => setBgColor && setBgColor(preset.hex)}
-                    className={`p-3 rounded-2xl border text-left flex flex-col justify-between h-20 transition-all cursor-pointer relative overflow-hidden ${
-                      isSelected
-                        ? "border-[#D97706] ring-2 ring-[#D97706]/30 shadow-sm"
-                        : "border-[#E2D4C3] hover:border-[#D97706]/60"
-                    }`}
-                    style={{ backgroundColor: preset.hex }}
-                  >
-                    <div className="flex justify-between items-center w-full">
-                      <span className={`text-[11px] font-extrabold ${preset.hex.toLowerCase() === "#120c0b" || preset.hex.toLowerCase() === "#0b0b0c" ? "text-white" : "text-[#1E1412]"}`}>
-                        {preset.name}
-                      </span>
-                      {isSelected && (
-                        <div className="w-4 h-4 rounded-full bg-[#D97706] text-white flex items-center justify-center">
-                          <Check size={10} />
-                        </div>
-                      )}
-                    </div>
-                    <span className={`text-[9px] ${preset.hex.toLowerCase() === "#120c0b" || preset.hex.toLowerCase() === "#0b0b0c" ? "text-amber-200/80" : "text-[#735E55]"}`}>
-                      {preset.hex}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Custom Color Input */}
-            <div className="flex items-center gap-3 pt-2">
-              <label className="text-xs font-bold text-[#1E1412] shrink-0">Custom Color:</label>
-              <div className="flex items-center gap-2 flex-1">
-                <input
-                  type="color"
-                  value={bgColor}
-                  onChange={(e) => setBgColor && setBgColor(e.target.value)}
-                  className="w-9 h-9 rounded-xl border border-[#E2D4C3] cursor-pointer bg-transparent p-0.5"
-                  title="Pick custom website background color"
-                />
-                <input
-                  type="text"
-                  value={bgColor}
-                  onChange={(e) => setBgColor && setBgColor(e.target.value)}
-                  placeholder="#FDFBF7"
-                  className="w-28 font-mono text-xs px-3 py-2 rounded-xl border border-[#E2D4C3] bg-[#FDFBF7] text-[#1E1412] focus:outline-none focus:border-[#D97706]"
-                />
-              </div>
-            </div>
-          </div>
 
           <div className="pt-6 border-t border-[#dac1c1]/30 flex justify-end">
             <button

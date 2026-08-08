@@ -147,7 +147,15 @@ export default function Splash({ onEnter }: SplashProps) {
           transition={{ delay: 0.5, duration: 0.8 }}
           className="mt-16 text-xs font-sans text-[#735E55] tracking-wider"
         >
-          Created with ☕ & 🍯 by <span className="font-bold text-[#1E1412]">Umme Ruksar</span> & <span className="font-bold text-[#1E1412]">Balaji C</span>
+          Created with ☕ & 🍯 by <span className="font-bold text-[#1E1412]">Umme Ruksar</span> &{" "}
+          <a
+            href="https://www.instagram.com/_bharatvanshi"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold text-[#1E1412] hover:text-[#95491a] transition-colors cursor-pointer"
+          >
+            Balaji C
+          </a>
         </motion.p>
       </motion.div>
     </div>

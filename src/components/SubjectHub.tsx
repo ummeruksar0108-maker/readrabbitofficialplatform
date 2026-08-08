@@ -50,6 +50,7 @@ interface SubjectHubProps {
   isAdmin: boolean;
   onBackToSubjects: () => void;
   onUpdateSubject: (updatedSubject: Subject) => Promise<boolean> | void;
+  onSendNotification?: (title: string, message: string, tag?: string) => void;
 }
 
 function getYouTubeVideoId(url: string): string | null {
@@ -66,6 +67,7 @@ export default function SubjectHub({
   isAdmin,
   onBackToSubjects,
   onUpdateSubject,
+  onSendNotification,
 }: SubjectHubProps) {
   const [activeTab, setActiveTab] = useState<"syllabus" | "materials" | "quiz">("syllabus");
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
@@ -469,6 +471,26 @@ export default function SubjectHub({
     alert("Study material deleted successfully from Supabase Storage and Database! 🥕");
   };
 
+  const handleDeleteSubjectTextbook = async (materialId: string) => {
+    if (!isAdmin) {
+      alert("Only an authenticated admin can delete textbooks.");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete this textbook?")) return;
+    const targetMat = (subject.textbooks || []).find(m => m.id === materialId);
+    
+    if (targetMat) {
+      await deleteMaterialFromSupabase(materialId, targetMat.cloudPath);
+    }
+
+    onUpdateSubject({
+      ...subject,
+      textbooks: (subject.textbooks || []).filter(m => m.id !== materialId),
+      materials: (subject.materials || []).filter(m => m.id !== materialId)
+    });
+    alert("Textbook deleted successfully! 🥕");
+  };
+
   const handleAddYoutubeLink = (unitId: string) => {
     if (!isAdmin) {
       alert("Only administrator account can attach YouTube links.");
@@ -684,7 +706,7 @@ export default function SubjectHub({
         addedTime: "Uploaded by Admin",
         type: cloudRes.type,
         isBookmarked: false,
-        tag: targetUnitId ? "Unit File" : "Subject File",
+        tag: targetUnitId === "textbook" ? "Prescribed Textbook" : targetUnitId ? "Unit File" : "Subject File",
         details: cloudRes.publicUrl,
         cloudPath: cloudRes.cloudPath,
         publicUrl: cloudRes.publicUrl,
@@ -695,22 +717,43 @@ export default function SubjectHub({
         unitId: cloudRes.unitId
       };
 
-      const updatedSubjectObj: Subject = targetUnitId ? {
-        ...subject,
-        units: subject.units.map(unit => {
-          if (unit.id !== targetUnitId) return unit;
-          return {
-            ...unit,
-            materials: [...(unit.materials || []), newMaterial]
-          };
-        })
-      } : {
-        ...subject,
-        materials: [...(subject.materials || []), newMaterial]
-      };
+      let updatedSubjectObj: Subject;
+
+      if (targetUnitId === "textbook") {
+        updatedSubjectObj = {
+          ...subject,
+          textbooks: [...(subject.textbooks || []), newMaterial],
+          materials: [...(subject.materials || []), newMaterial]
+        };
+      } else if (targetUnitId) {
+        updatedSubjectObj = {
+          ...subject,
+          units: subject.units.map(unit => {
+            if (unit.id !== targetUnitId) return unit;
+            return {
+              ...unit,
+              materials: [...(unit.materials || []), newMaterial]
+            };
+          })
+        };
+      } else {
+        updatedSubjectObj = {
+          ...subject,
+          materials: [...(subject.materials || []), newMaterial]
+        };
+      }
 
       // 3. Update subject state locally (no Firestore write)
       onUpdateSubject(updatedSubjectObj);
+
+      // Dispatch Real-time Notification for Chosen Course!
+      if (onSendNotification) {
+        onSendNotification(
+          `New File Uploaded for ${courseName || "Your Course"}`,
+          `A new ${targetUnitId === "textbook" ? "textbook" : "study material"} PDF "${cloudRes.name}" was uploaded for ${subject.name} (${semesterName || "Semester"}).`,
+          targetUnitId === "textbook" ? "NEW TEXTBOOK" : "COURSE MATERIAL"
+        );
+      }
 
       setLastUploadedMaterialName(cloudRes.name);
       setUploadSuccess(`✅ "${cloudRes.name}" successfully uploaded to Supabase Storage and metadata saved to Supabase study_materials table! Synced across all devices.`);
@@ -933,17 +976,6 @@ export default function SubjectHub({
     }
 
     if (isLang1Subject) {
-      const existingTb = subject.units.find(u => u.name.toLowerCase().includes("textbook"));
-      const tbUnit: Unit = existingTb ? { ...existingTb, name: "Textbook", number: "00" } : {
-        id: `${subject.id}_tb`,
-        number: "00",
-        name: "Textbook",
-        description: `${subject.name} - Prescribed Textbook & Core Course Reading`,
-        masteryPercent: 0,
-        status: "In Progress" as const,
-        materials: subject.textbooks || []
-      };
-
       const chapterNames = ["Chapter 1", "Chapter 2", "Chapter 3", "Chapter 4"];
       const chUnits: Unit[] = chapterNames.map((chName, idx) => {
         const existing = subject.units.find(u => u.name.toLowerCase().includes(chName.toLowerCase()) || u.number === `0${idx + 1}`);
@@ -963,10 +995,10 @@ export default function SubjectHub({
         };
       });
 
-      return [tbUnit, ...chUnits];
+      return chUnits;
     }
 
-    return subject.units;
+    return subject.units.filter(u => !u.name.toLowerCase().includes("textbook") && u.kind !== "textbook");
   }, [subject, isLabSubject, isLang1Subject]);
 
   // Language II Options computation: Kannada, Hindi, Additional English
@@ -1837,7 +1869,7 @@ export default function SubjectHub({
           <div className="space-y-6">
             {/* Prescribed Textbook Card */}
             {!isLang2Subject && !isLabSubject && (
-              <section className="bg-white rounded-3xl p-5 md:p-6 border border-[#D8C4AC] shadow-sm">
+              <section className="bg-white rounded-3xl p-5 md:p-6 border border-[#D8C4AC] shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-[#561C24] text-white flex items-center justify-center shrink-0">
@@ -1856,38 +1888,171 @@ export default function SubjectHub({
                     </div>
                   </div>
 
-                  {(subject.textbooks || []).length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => openMaterial(subject.textbooks![0])}
-                      className="px-4 py-2.5 rounded-xl bg-[#561C24] hover:bg-[#6D2932] text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <Eye size={14} />
-                      Open Textbook
-                    </button>
-                  ) : (
-                    <span className="px-4 py-2.5 rounded-xl bg-[#F8F4EF] border border-[#D8C4AC] text-[#8B6B52] text-xs font-bold">
-                      Textbook coming soon
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {(subject.textbooks || []).length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => openMaterial(subject.textbooks![0])}
+                        className="px-4 py-2.5 rounded-xl bg-[#561C24] hover:bg-[#6D2932] text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+                      >
+                        <Eye size={14} />
+                        Open Textbook
+                      </button>
+                    ) : (
+                      <span className="px-4 py-2.5 rounded-xl bg-[#F8F4EF] border border-[#D8C4AC] text-[#8B6B52] text-xs font-bold">
+                        Textbook coming soon
+                      </span>
+                    )}
+                  </div>
                 </div>
 
+                {/* Listed Textbooks */}
                 {(subject.textbooks || []).length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-[#D8C4AC]/50 space-y-2">
+                  <div className="pt-3 border-t border-[#D8C4AC]/50 space-y-2">
+                    <span className="text-[10px] font-extrabold text-[#A67C52] tracking-wider uppercase block">
+                      📄 Attached Prescribed Textbooks ({(subject.textbooks || []).length}):
+                    </span>
                     {(subject.textbooks || []).map((book) => (
-                      <button
+                      <div
                         key={book.id}
-                        type="button"
-                        onClick={() => openMaterial(book)}
-                        className="w-full p-3 rounded-xl bg-[#F8F4EF] hover:bg-[#EEE4DA] border border-[#D8C4AC] flex items-center justify-between gap-3 text-left transition-all cursor-pointer"
+                        className="p-3 bg-[#F8F4EF] hover:bg-[#EEE4DA] rounded-xl border border-[#D8C4AC] flex flex-wrap justify-between items-center transition-all gap-2 group/tb"
                       >
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-[#561C24] truncate">{book.name}</p>
-                          <p className="text-[10px] text-[#8B6B52] mt-0.5">{book.size}</p>
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-[#561C24] text-white">
+                            <BookOpen size={15} />
+                          </div>
+                          <div className="text-left min-w-0">
+                            <h5 className="font-bold text-xs text-[#561C24] truncate">
+                              {book.name}
+                            </h5>
+                            <p className="text-[10px] text-[#8B6B52] mt-0.5">
+                              {book.size || "PDF Textbook"} • Prescribed Material
+                            </p>
+                          </div>
                         </div>
-                        <ChevronRight size={16} className="text-[#A67C52] shrink-0" />
-                      </button>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openMaterial(book)}
+                            className="px-2.5 py-1.5 bg-[#561C24] hover:bg-[#6D2932] text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                            title="View textbook document"
+                          >
+                            <Eye size={12} />
+                            <span>View</span>
+                          </button>
+
+                          {isMaterialDownloaded(book) ? (
+                            <button
+                              type="button"
+                              onClick={() => setDownloadPromptMaterial(book)}
+                              className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                            >
+                              <FileCheck size={12} className="text-emerald-700" />
+                              <span>✓ Downloaded</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadFile(book)}
+                              className="px-2.5 py-1.5 bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                            >
+                              <Download size={12} />
+                              <span>Download</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleManualSaveToWeb(book.name)}
+                            disabled={isSavingWeb}
+                            className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                          >
+                            <Save size={12} />
+                            <span>Save</span>
+                          </button>
+
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSubjectTextbook(book.id)}
+                              className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                              title="Delete Textbook"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Admin Upload Section for Textbook */}
+                {isAdmin ? (
+                  <div className="pt-3 border-t border-[#D8C4AC]/50 space-y-3 text-left">
+                    <span className="text-[10px] font-extrabold text-[#561C24] uppercase block">
+                      ➕ Upload Textbook PDF for {subject.name}
+                    </span>
+
+                    {uploadSuccess && (
+                      <div className="p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl space-y-2 text-left animate-fade-in shadow-xs">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle size={16} className="text-emerald-700 shrink-0" />
+                            <p className="text-[11px] font-bold text-emerald-900">
+                              {uploadSuccess}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleManualSaveToWeb(lastUploadedMaterialName || "Uploaded Textbook")}
+                            disabled={isSavingWeb}
+                            className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-extrabold rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
+                          >
+                            <Save size={12} />
+                            <span>{isSavingWeb ? "Saving..." : webSaveSuccess ? "✅ Saved!" : "💾 Save to Web"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div
+                      onDragOver={onDragOver}
+                      onDragLeave={onDragLeave}
+                      onDrop={(e) => onDrop(e, "textbook")}
+                      className={`border border-dashed rounded-xl p-3.5 text-center cursor-pointer transition-all ${
+                        isDragging ? "border-[#561C24] bg-[#F8F4EF]" : "border-[#D8C4AC] hover:border-[#561C24] bg-white"
+                      }`}
+                    >
+                      <input
+                        type="file"
+                        id={`admin-textbook-file-input-${subject.id}`}
+                        accept=".pdf,application/pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleProcessFile(e.target.files[0], "textbook");
+                          }
+                          e.target.value = "";
+                        }}
+                      />
+                      <label htmlFor={`admin-textbook-file-input-${subject.id}`} className="cursor-pointer space-y-1 block">
+                        <Upload size={18} className="text-[#561C24] mx-auto" />
+                        <div className="text-[10px] text-[#4E342E]">
+                          Upload Prescribed Textbook PDF • <span className="text-[#561C24] font-bold underline">Click to browse</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-3 border-t border-[#D8C4AC]/50 text-left">
+                    <div className="flex items-center gap-2 text-[#735E55]">
+                      <Lock size={14} className="shrink-0 text-[#B45309]" />
+                      <p className="text-[11px] font-medium text-[#4E342E]">
+                        Read-Only Mode: Log in as Administrator to upload or delete prescribed textbook PDFs.
+                      </p>
+                    </div>
                   </div>
                 )}
               </section>
