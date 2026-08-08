@@ -950,55 +950,55 @@ export default function SubjectHub({
   // Display Units computation for Labs, Language I, and standard theory subjects
   const displayUnits = useMemo(() => {
     if (isLabSubject) {
+      if (subject.units && subject.units.length > 0) {
+        return subject.units;
+      }
       const requiredLabSections = [
         { name: "Manual", desc: "Comprehensive Laboratory Manual, experiment procedures, and theoretical instructions." },
         { name: "Outputs", desc: "Sample code outputs, practical execution screenshots, and terminal results." },
         { name: "Viva Questions", desc: "Essential viva voce questions, practical exam interview Q&A, and lab quizzes." }
       ];
 
-      return requiredLabSections.map((sec, idx) => {
-        const existing = subject.units.find(u => u.name.toLowerCase().includes(sec.name.toLowerCase()));
-        if (existing) {
-          return { ...existing, name: sec.name, number: `0${idx + 1}` };
-        }
-        return {
-          id: `${subject.id}_lab_${idx + 1}`,
-          number: `0${idx + 1}`,
-          name: sec.name,
-          description: `${subject.name} - ${sec.desc}`,
-          masteryPercent: 0,
-          status: "In Progress" as const,
-          materials: [],
-          importantQuestions: [],
-          youtubeLinks: []
-        };
-      });
+      return requiredLabSections.map((sec, idx) => ({
+        id: `${subject.id}_lab_${idx + 1}`,
+        number: `0${idx + 1}`,
+        name: sec.name,
+        description: `${subject.name} - ${sec.desc}`,
+        masteryPercent: 0,
+        status: "In Progress" as const,
+        materials: [],
+        importantQuestions: [],
+        youtubeLinks: []
+      }));
     }
 
     if (isLang1Subject) {
-      const chapterNames = ["Chapter 1", "Chapter 2", "Chapter 3", "Chapter 4"];
-      const chUnits: Unit[] = chapterNames.map((chName, idx) => {
-        const existing = subject.units.find(u => u.name.toLowerCase().includes(chName.toLowerCase()) || u.number === `0${idx + 1}`);
-        if (existing) {
-          return { ...existing, name: chName, number: `0${idx + 1}` };
-        }
-        return {
-          id: `${subject.id}_ch_${idx + 1}`,
-          number: `0${idx + 1}`,
-          name: chName,
-          description: `${subject.name} - ${chName} Study Material & Notes`,
-          masteryPercent: 0,
-          status: "In Progress" as const,
-          materials: [],
-          importantQuestions: [],
-          youtubeLinks: []
-        };
-      });
+      // Filter out textbook unit (which is displayed separately in the Prescribed Reference section)
+      const nonTextbookUnits = (subject.units || []).filter(
+        u => u.kind !== "textbook" && !u.name.toLowerCase().includes("textbook")
+      );
 
-      return chUnits;
+      // If units exist in subject.units, return ALL of them, preserving custom titles and newly added cards!
+      if (nonTextbookUnits.length > 0) {
+        return nonTextbookUnits;
+      }
+
+      // Default fallback if subject.units is empty
+      const chapterNames = ["Chapter 1", "Chapter 2", "Chapter 3", "Chapter 4"];
+      return chapterNames.map((chName, idx) => ({
+        id: `${subject.id}_ch_${idx + 1}`,
+        number: `0${idx + 1}`,
+        name: chName,
+        description: `${subject.name} - ${chName} Study Material & Notes`,
+        masteryPercent: 0,
+        status: "In Progress" as const,
+        materials: [],
+        importantQuestions: [],
+        youtubeLinks: []
+      }));
     }
 
-    return subject.units.filter(u => !u.name.toLowerCase().includes("textbook") && u.kind !== "textbook");
+    return (subject.units || []).filter(u => !u.name.toLowerCase().includes("textbook") && u.kind !== "textbook");
   }, [subject, isLabSubject, isLang1Subject]);
 
   // Language II Options computation: Kannada, Hindi, Additional English
