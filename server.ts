@@ -69,6 +69,47 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+// GET /api/notifications - Retrieve globally published notifications
+const NOTIFICATIONS_FILE = path.join(DATA_DIR, "notifications.json");
+
+app.get("/api/notifications", async (req, res) => {
+  try {
+    if (fs.existsSync(NOTIFICATIONS_FILE)) {
+      const data = await fsPromises.readFile(NOTIFICATIONS_FILE, "utf-8");
+      return res.json(JSON.parse(data));
+    }
+    return res.json([]);
+  } catch (error) {
+    return res.status(500).json({ error: "Failed to read notifications" });
+  }
+});
+
+// POST /api/notifications - Broadcast and save notification
+app.post("/api/notifications", async (req, res) => {
+  try {
+    const newNotif = req.body;
+    let currentNotifs: any[] = [];
+    if (fs.existsSync(NOTIFICATIONS_FILE)) {
+      try {
+        const data = await fsPromises.readFile(NOTIFICATIONS_FILE, "utf-8");
+        currentNotifs = JSON.parse(data);
+      } catch (e) {
+        currentNotifs = [];
+      }
+    }
+    if (Array.isArray(newNotif)) {
+      currentNotifs = newNotif;
+    } else if (newNotif && newNotif.title) {
+      currentNotifs = [newNotif, ...currentNotifs];
+    }
+    await fsPromises.writeFile(NOTIFICATIONS_FILE, JSON.stringify(currentNotifs, null, 2));
+    console.log(`[SERVER NOTIFICATION BROADCAST] Saved notification broadcast to disk (${currentNotifs.length} total).`);
+    return res.json({ success: true, notifications: currentNotifs });
+  } catch (error: any) {
+    return res.status(500).json({ error: "Failed to broadcast notification", details: error.message });
+  }
+});
+
 // GET /api/curriculum - Retrieve permanently stored curriculum
 app.get("/api/curriculum", async (req, res) => {
   try {

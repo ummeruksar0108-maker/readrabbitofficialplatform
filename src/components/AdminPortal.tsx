@@ -495,6 +495,7 @@ export default function AdminPortal({
                   difficulty: subDiff,
                   icon: subIcon,
                   isLab: subIsLab,
+                  modulesCount: formUnits.length,
                   units: formUnits
                 };
               }

@@ -38,26 +38,61 @@ export default function JavaMaterials({
   // Selected question paper state
   const [selectedQuestionFile, setSelectedQuestionFile] = useState<StudyMaterial | null>(null);
 
-  // Trigger simulated download
-  const handleDownload = (material: StudyMaterial) => {
+  // Trigger real file download
+  const handleDownload = async (material: StudyMaterial) => {
     if (downloadingId) return;
     setDownloadingId(material.id);
-    setDownloadProgress(0);
+    setDownloadProgress(20);
 
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.floor(Math.random() * 20) + 10;
-      if (progress >= 100) {
-        setDownloadProgress(100);
-        clearInterval(interval);
-        setTimeout(() => {
-          setDownloadingId(null);
-          alert(`Study companion! 🥕 "${material.name}" has been successfully saved to your device.`);
-        }, 400);
-      } else {
-        setDownloadProgress(progress);
+    try {
+      let downloadUrl = material.details || "";
+      let fileName = material.name.trim();
+      if (!fileName.toLowerCase().endsWith(".pdf")) {
+        fileName += ".pdf";
       }
-    }, 150);
+
+      setDownloadProgress(60);
+
+      // Create a Blob for the file content
+      let blob: Blob;
+      if (downloadUrl.startsWith("data:")) {
+        const parts = downloadUrl.split(",");
+        const bstr = atob(parts[1] || parts[0]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        blob = new Blob([u8arr], { type: "application/pdf" });
+      } else if (downloadUrl.startsWith("http") || downloadUrl.startsWith("/api/files/")) {
+        const res = await fetch(downloadUrl);
+        blob = await res.blob();
+      } else {
+        // Plain text / notes content
+        blob = new Blob([material.details || `${material.name}\n\nJava Study Notes & Reference Material`], { type: "text/plain;charset=utf-8" });
+        if (!fileName.endsWith(".txt") && !fileName.endsWith(".pdf")) fileName += ".txt";
+      }
+
+      setDownloadProgress(90);
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setDownloadProgress(100);
+      setTimeout(() => {
+        setDownloadingId(null);
+        URL.revokeObjectURL(url);
+      }, 500);
+    } catch (err) {
+      console.error("Download failed:", err);
+      setDownloadingId(null);
+      alert(`Could not download "${material.name}". Please try again.`);
+    }
   };
 
   // Run/simulate java code

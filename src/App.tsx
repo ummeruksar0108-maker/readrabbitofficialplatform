@@ -15,7 +15,7 @@ import AdminPortal from "./components/AdminPortal";
 import AddSubjectModal from "./components/AddSubjectModal";
 import FirebaseDiagnosticsPanel from "./components/FirebaseDiagnosticsPanel";
 import { Logo } from "./components/Logo";
-import { logDiagnostic, saveCoursesToFirestore, loadCoursesFromFirestore } from "./lib/firebase";
+import { logDiagnostic, saveCoursesToFirestore, loadCoursesFromFirestore, subscribeCoursesFromFirestore, saveNotificationsToFirestore, subscribeNotificationsFromFirestore } from "./lib/firebase";
 import { supabase, fetchAllMaterialsFromSupabaseDB, mergeSupabaseMaterialsIntoCourses } from "./lib/supabase";
 
 // Icons for Responsive Top Bar
@@ -50,8 +50,35 @@ export default function App() {
     localStorage.setItem("read_rabbit_bg_color", bgColor);
   }, [bgColor]);
 
-  // Splash Screen State - always show initial loading display on web page open
-  const [isSplash, setIsSplash] = useState(true);
+  // Initial navigation state restored from URL Hash or LocalStorage
+  const initialHashState = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const hash = window.location.hash.replace(/^#/, "");
+    if (!hash) return null;
+    if (hash === "splash") {
+      return { isSplash: true, courseId: null, semId: null, subId: null, tab: "semesters" };
+    }
+    const params = new URLSearchParams(hash);
+    const courseId = params.get("course") || null;
+    const semStr = params.get("sem");
+    const semId = semStr ? parseInt(semStr, 10) : null;
+    const subId = params.get("subject") || null;
+    const tab = params.get("tab") || (subId ? "units" : semId ? "subjects" : "semesters");
+    return {
+      isSplash: false,
+      courseId,
+      semId: Number.isNaN(semId) ? null : semId,
+      subId,
+      tab
+    };
+  }, []);
+
+  // Splash Screen State - restore from Hash or LocalStorage (defaulting to true on first visit)
+  const [isSplash, setIsSplash] = useState(() => {
+    if (initialHashState) return initialHashState.isSplash;
+    const saved = localStorage.getItem("read_rabbit_is_splash");
+    return saved === "false" ? false : true;
+  });
 
   // Core Courses State with Local Storage persistence
   const [courses, setCourses] = useState<Course[]>(() => {
@@ -78,18 +105,22 @@ export default function App() {
 
   // Active state tracks
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(() => {
+    if (initialHashState && initialHashState.courseId) return initialHashState.courseId;
     return localStorage.getItem("read_rabbit_selected_course_id") || null;
   });
   const [selectedSemesterId, setSelectedSemesterId] = useState<number | null>(() => {
+    if (initialHashState && initialHashState.semId !== null) return initialHashState.semId;
     const savedSem = localStorage.getItem("read_rabbit_selected_semester_id");
     return savedSem ? parseInt(savedSem, 10) : null;
   });
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(() => {
+    if (initialHashState && initialHashState.subId) return initialHashState.subId;
     return localStorage.getItem("read_rabbit_selected_subject_id") || null;
   });
 
   // Sidebar tab control: semesters, library, settings, admin
   const [activeTab, setActiveTab] = useState(() => {
+    if (initialHashState && initialHashState.tab) return initialHashState.tab;
     const savedTab = localStorage.getItem("read_rabbit_active_tab");
     if (savedTab) return savedTab;
     const savedSubject = localStorage.getItem("read_rabbit_selected_subject_id");
@@ -158,22 +189,73 @@ export default function App() {
     localStorage.setItem("read_rabbit_notifications_v1", JSON.stringify(notifications));
   }, [notifications]);
 
+  // Real-time Firestore notification listener & server sync
+  useEffect(() => {
+    // 1. Initial fetch from Express server disk
+    fetch("/api/notifications")
+      .then(res => res.ok ? res.json() : [])
+      .then(serverNotifs => {
+        if (Array.isArray(serverNotifs) && serverNotifs.length > 0) {
+          setNotifications(prev => {
+            const combined = [...serverNotifs];
+            prev.forEach(p => {
+              if (!combined.some(c => c.id === p.id)) {
+                combined.push(p);
+              }
+            });
+            return combined;
+          });
+        }
+      })
+      .catch(() => {});
+
+    // 2. Real-time Firestore notifications listener
+    const unsubscribe = subscribeNotificationsFromFirestore((remoteNotifs) => {
+      if (Array.isArray(remoteNotifs) && remoteNotifs.length > 0) {
+        setNotifications(prev => {
+          const combined = [...remoteNotifs];
+          prev.forEach(p => {
+            if (!combined.some(c => c.id === p.id)) {
+              combined.push(p);
+            }
+          });
+          return combined;
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   // Derived unread check
   const hasUnreadNotifications = useMemo(() => {
     return notifications.some(n => !n.isRead);
   }, [notifications]);
 
-  // Add Notification callback
+  // Add Notification callback (dispatches to local state, Express server & Firestore cloud)
   const handleSendNotification = (title: string, message: string, tag?: string) => {
     const newNotif: AppNotification = {
-      id: "notif_" + Date.now(),
+      id: "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
       title,
       message,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + " " + new Date().toLocaleDateString([], { month: "short", day: "numeric" }),
       isRead: false,
       tag: tag || "General"
     };
-    setNotifications(prev => [newNotif, ...prev]);
+
+    setNotifications(prev => {
+      const updated = [newNotif, ...prev];
+      // Sync to Express Server
+      fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newNotif)
+      }).catch(err => console.warn("[Server Notif Sync Fail]", err));
+
+      // Sync to Firestore Cloud
+      saveNotificationsToFirestore(updated);
+      return updated;
+    });
   };
 
   // Mark all notifications as read
@@ -226,7 +308,7 @@ export default function App() {
     }
   };
 
-  // Helper function to fetch latest curriculum from Express server, Firestore DB & Supabase PostgreSQL
+  // Helper function to fetch latest curriculum from Firestore DB, Express server & Supabase PostgreSQL
   const fetchCurriculumFromServer = async (isManualCall = false) => {
     if (isManualCall) setIsSyncingServer(true);
     isFetchingFromServer.current = true;
@@ -234,30 +316,30 @@ export default function App() {
       let baseCourses: Course[] = initialCourses;
       let loadedFromCloud = false;
 
-      // 1. Try Express server disk file with cache-busting query timestamp
+      // 1. Primary: Try Firebase Firestore Cloud Database (shared across all devices)
       try {
-        const res = await fetch("/api/curriculum?t=" + Date.now(), { cache: "no-store" });
-        if (res.ok) {
-          const serverData = await res.json();
-          if (serverData && hasAllDefaultCourses(serverData)) {
-            baseCourses = serverData as Course[];
-            loadedFromCloud = true;
-          }
+        const firestoreCourses = await loadCoursesFromFirestore();
+        if (firestoreCourses && hasAllDefaultCourses(firestoreCourses)) {
+          baseCourses = firestoreCourses as Course[];
+          loadedFromCloud = true;
         }
       } catch (e) {
-        console.warn("[SERVER CURRICULUM FETCH WARN]", e);
+        console.warn("[FIRESTORE FETCH WARN]", e);
       }
 
-      // 2. Try Firestore Cloud Database if server disk did not provide customized structure
+      // 2. Secondary fallback: Try Express server disk file with cache-busting timestamp
       if (!loadedFromCloud) {
         try {
-          const firestoreCourses = await loadCoursesFromFirestore();
-          if (firestoreCourses && hasAllDefaultCourses(firestoreCourses)) {
-            baseCourses = firestoreCourses as Course[];
-            loadedFromCloud = true;
+          const res = await fetch("/api/curriculum?t=" + Date.now(), { cache: "no-store" });
+          if (res.ok) {
+            const serverData = await res.json();
+            if (serverData && hasAllDefaultCourses(serverData)) {
+              baseCourses = serverData as Course[];
+              loadedFromCloud = true;
+            }
           }
         } catch (e) {
-          console.warn("[FIRESTORE FETCH WARN]", e);
+          console.warn("[SERVER CURRICULUM FETCH WARN]", e);
         }
       }
 
@@ -298,12 +380,32 @@ export default function App() {
     }
   };
 
-  // Load initial curriculum state and establish auto-sync polling + tab focus listeners
+  // Load initial curriculum state and establish Firestore real-time listener + polling
   useEffect(() => {
     fetchCurriculumFromServer();
 
+    // Attach real-time listener to Firestore Cloud DB for instant cross-device updates
+    let unsubscribeFirestore: (() => void) | null = null;
+    try {
+      unsubscribeFirestore = subscribeCoursesFromFirestore(async (firestoreCourses) => {
+        // Only accept cloud updates if local edits haven't occurred in the last 4 seconds
+        if (Date.now() - lastLocalMutationTime.current > 4000) {
+          if (firestoreCourses && hasAllDefaultCourses(firestoreCourses)) {
+            const supabaseMaterials = await fetchAllMaterialsFromSupabaseDB();
+            const merged = mergeSupabaseMaterialsIntoCourses(firestoreCourses as Course[], supabaseMaterials);
+            const finalCourses = ensureAllLanguageCardsExist(merged);
+            setCourses(finalCourses);
+            localStorage.setItem(CURRICULUM_STORAGE_KEY, JSON.stringify(finalCourses));
+            setLastSyncSuccessTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+          }
+        }
+      });
+    } catch (e) {
+      console.warn("[FIRESTORE REALTIME SUBSCRIPTION WARN]", e);
+    }
+
     const handleSyncOnFocus = () => {
-      // Only fetch from cloud if user hasn't made a local edit in the last 5 seconds
+      // Fetch from cloud if user hasn't made a local edit in the last 5 seconds
       if (Date.now() - lastLocalMutationTime.current > 5000) {
         fetchCurriculumFromServer();
       }
@@ -323,6 +425,7 @@ export default function App() {
     }, 12000);
 
     return () => {
+      if (unsubscribeFirestore) unsubscribeFirestore();
       window.removeEventListener("focus", handleSyncOnFocus);
       document.removeEventListener("visibilitychange", handleVisChange);
       clearInterval(pollInterval);
@@ -338,39 +441,58 @@ export default function App() {
     saveCurriculumToServer(courses);
   }, [courses]);
 
+  // Helper to construct URL Hash string
+  const buildLocationHash = (
+    splashVal: boolean,
+    courseId: string | null,
+    semId: number | null,
+    subId: string | null,
+    tab: string
+  ) => {
+    if (splashVal) return "#splash";
+    const params = new URLSearchParams();
+    if (courseId) params.set("course", courseId);
+    if (semId !== null) params.set("sem", semId.toString());
+    if (subId) params.set("subject", subId);
+    if (tab && tab !== "semesters") params.set("tab", tab);
+    const str = params.toString();
+    return str ? `#${str}` : "";
+  };
+
+  // Persist State Changes to Local Storage and Sync URL Hash for reload recovery
   useEffect(() => {
     if (selectedCourseId) {
       localStorage.setItem("read_rabbit_selected_course_id", selectedCourseId);
     } else {
       localStorage.removeItem("read_rabbit_selected_course_id");
     }
-  }, [selectedCourseId]);
 
-  useEffect(() => {
     if (selectedSemesterId !== null) {
       localStorage.setItem("read_rabbit_selected_semester_id", selectedSemesterId.toString());
     } else {
       localStorage.removeItem("read_rabbit_selected_semester_id");
     }
-  }, [selectedSemesterId]);
 
-  useEffect(() => {
     if (selectedSubjectId) {
       localStorage.setItem("read_rabbit_selected_subject_id", selectedSubjectId);
     } else {
       localStorage.removeItem("read_rabbit_selected_subject_id");
     }
-  }, [selectedSubjectId]);
 
-  useEffect(() => {
     localStorage.setItem("read_rabbit_is_splash", isSplash ? "true" : "false");
-  }, [isSplash]);
-
-  useEffect(() => {
     localStorage.setItem("read_rabbit_active_tab", activeTab);
-  }, [activeTab]);
 
-  
+    // Keep URL Hash synchronized for instant refresh recovery
+    const targetHash = buildLocationHash(isSplash, selectedCourseId, selectedSemesterId, selectedSubjectId, activeTab);
+    if (window.location.hash !== targetHash) {
+      window.history.replaceState(
+        { isSplash, selectedCourseId, selectedSemesterId, selectedSubjectId, activeTab },
+        "",
+        targetHash || window.location.pathname + window.location.search
+      );
+    }
+  }, [selectedCourseId, selectedSemesterId, selectedSubjectId, isSplash, activeTab]);
+
   // Helper to verify single configured admin email
   const isApprovedAdminEmail = (userEmail?: string | null): boolean => {
     if (!userEmail) return false;
@@ -421,6 +543,7 @@ export default function App() {
     tab: string,
     splashVal: boolean = false
   ) => {
+    const targetHash = buildLocationHash(splashVal, courseId, semesterId, subjectId, tab);
     const newState = {
       isSplash: splashVal,
       selectedCourseId: courseId,
@@ -429,22 +552,11 @@ export default function App() {
       activeTab: tab
     };
 
-    const current = window.history.state;
-    if (
-      !current ||
-      current.selectedCourseId !== courseId ||
-      current.selectedSemesterId !== semesterId ||
-      current.selectedSubjectId !== subjectId ||
-      current.activeTab !== tab ||
-      current.isSplash !== splashVal
-    ) {
-      window.history.pushState(newState, "");
-    }
+    window.history.pushState(newState, "", targetHash || window.location.pathname + window.location.search);
   };
 
   // Synchronize popstate event (Browser Back / Mobile Back Gesture)
   useEffect(() => {
-    // Save initial state into history
     const initialHist = {
       isSplash,
       selectedCourseId,
@@ -452,9 +564,8 @@ export default function App() {
       selectedSubjectId,
       activeTab
     };
-    if (!window.history.state) {
-      window.history.replaceState(initialHist, "");
-    }
+    const initialHash = buildLocationHash(isSplash, selectedCourseId, selectedSemesterId, selectedSubjectId, activeTab);
+    window.history.replaceState(initialHist, "", initialHash || window.location.pathname + window.location.search);
 
     const handlePopState = (e: PopStateEvent) => {
       const state = e.state;
@@ -469,16 +580,35 @@ export default function App() {
           setActiveTab(state.activeTab);
         }
       } else {
-        // Fallback for root state
-        setIsSplash(false);
-        setSelectedSubjectId(null);
-        setSelectedSemesterId(null);
-        setActiveTab("semesters");
+        // Parse location hash if state is missing
+        const hash = window.location.hash.replace(/^#/, "");
+        if (hash) {
+          const params = new URLSearchParams(hash);
+          const cId = params.get("course");
+          const sStr = params.get("sem");
+          const sId = sStr ? parseInt(sStr, 10) : null;
+          const sub = params.get("subject");
+          const t = params.get("tab") || (sub ? "units" : sId ? "subjects" : "semesters");
+          setIsSplash(hash === "splash");
+          setSelectedCourseId(cId);
+          setSelectedSemesterId(sId);
+          setSelectedSubjectId(sub);
+          setActiveTab(t);
+        } else {
+          setIsSplash(false);
+          setSelectedSubjectId(null);
+          setSelectedSemesterId(null);
+          setActiveTab("semesters");
+        }
       }
     };
 
     window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    window.addEventListener("hashchange", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("hashchange", handlePopState);
+    };
   }, []);
 
   // Derived Active Models
@@ -718,10 +848,8 @@ export default function App() {
     return (
       <Splash
         onEnter={() => {
-          setSelectedCourseId(null);
-          setSelectedSemesterId(null);
-          setSelectedSubjectId(null);
           setIsSplash(false);
+          localStorage.setItem("read_rabbit_is_splash", "false");
         }}
       />
     );
@@ -810,16 +938,6 @@ export default function App() {
 
           {/* Quick AI Search & Cloud Sync & Notifications */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => fetchCurriculumFromServer(true)}
-              disabled={isSyncingServer}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fff2e1] hover:bg-[#f8e6cb] text-[#95491a] rounded-xl border border-[#dac1c1]/40 text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
-              title="Sync latest curriculum from cloud"
-            >
-              <RefreshCw size={14} className={`text-[#95491a] ${isSyncingServer ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">{isSyncingServer ? "Syncing..." : "Sync Cloud"}</span>
-            </button>
-
             <div className="hidden sm:flex items-center gap-2 bg-[#fff2e1]/60 px-3 py-1.5 rounded-xl border border-[#dac1c1]/40 focus-within:border-[#fd9b65] transition-colors max-w-xs">
               <Search size={16} className="text-[#877272]" />
               <input
@@ -929,12 +1047,13 @@ export default function App() {
             {/* Cloud Server Live Sync Button */}
             <button
               onClick={() => fetchCurriculumFromServer(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/60 rounded-xl transition-all text-xs font-bold cursor-pointer active:scale-95 shadow-2xs"
-              title={`Synced with Web Cloud Server${lastSyncSuccessTime ? ` at ${lastSyncSuccessTime}` : ""}. Click to re-sync.`}
+              disabled={isSyncingServer}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fff2e1] hover:bg-[#f8e6cb] text-[#95491a] border border-[#dac1c1]/40 rounded-xl transition-all text-xs font-bold cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
+              title={`Synced with Cloud Database${lastSyncSuccessTime ? ` at ${lastSyncSuccessTime}` : ""}. Click to re-sync.`}
             >
-              <RefreshCw size={13} className={`text-emerald-700 ${isSyncingServer ? "animate-spin" : ""}`} />
+              <RefreshCw size={13} className={`text-[#95491a] ${isSyncingServer ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">
-                {isSyncingServer ? "Syncing..." : "Cloud Synced"}
+                {isSyncingServer ? "Syncing..." : lastSyncSuccessTime ? `Synced (${lastSyncSuccessTime})` : "Sync Cloud"}
               </span>
             </button>
 

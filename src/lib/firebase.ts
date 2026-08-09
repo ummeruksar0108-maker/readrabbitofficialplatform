@@ -151,39 +151,18 @@ export async function uploadFileToCloud(
   }
 }
 
-let firestoreQuotaExceededUntil = typeof window !== "undefined" && window.sessionStorage?.getItem("firestore_quota_exceeded") ? Date.now() + 86400000 : 0;
+let firestoreQuotaExceededUntil = 0;
 
 /**
  * Saves the entire curriculum and materials tree to Firebase Firestore.
  */
 export async function saveCoursesToFirestore(coursesData: any[]): Promise<boolean> {
-  if (Date.now() < firestoreQuotaExceededUntil || (typeof window !== "undefined" && window.sessionStorage?.getItem("firestore_quota_exceeded"))) {
-    console.warn("[Firestore Quota Skip] Skipping Firestore write because free tier daily write quota was exceeded. Relying on Supabase, Express server & local storage.");
-    return false;
-  }
-
   logDiagnostic("info", `Writing curriculum payload (${coursesData.length} courses) to Firestore 'courses/main'...`);
   try {
     const courseDocRef = doc(db, "courses", "main");
-    // Strip study material metadata so materials are stored ONLY in Supabase PostgreSQL study_materials table
-    const cleanCoursesData = coursesData.map((course: any) => ({
-      ...course,
-      semesters: (course.semesters || []).map((sem: any) => ({
-        ...sem,
-        subjects: (sem.subjects || []).map((sub: any) => {
-          const { materials, ...subWithoutMaterials } = sub;
-          return {
-            ...subWithoutMaterials,
-            units: (sub.units || []).map((unit: any) => {
-              const { materials: unitMaterials, ...unitWithoutMaterials } = unit;
-              return unitWithoutMaterials;
-            })
-          };
-        })
-      }))
-    }));
+    // Preserve full courses data structure including custom cards, subjects, units, and materials
     const payload = {
-      coursesData: cleanCoursesData,
+      coursesData: coursesData,
       updatedAt: new Date().toISOString()
     };
 
@@ -259,6 +238,44 @@ export async function loadCoursesFromFirestore(): Promise<any[] | null> {
 /**
  * Real-time listener for Firestore courses updates across all devices.
  */
+export function saveNotificationsToFirestore(notifications: any[]): Promise<boolean> {
+  logDiagnostic("info", `Saving ${notifications.length} notifications to Firestore 'notifications/main'...`);
+  try {
+    const notifDocRef = doc(db, "notifications", "main");
+    setDoc(notifDocRef, {
+      notifications,
+      updatedAt: new Date().toISOString()
+    });
+    logDiagnostic("success", "[Firestore Notifications] Saved notifications to Firestore cloud!");
+    return Promise.resolve(true);
+  } catch (err: any) {
+    logDiagnostic("warn", `[Firestore Notifications Write Fail] ${err?.message || err}`);
+    return Promise.resolve(false);
+  }
+}
+
+export function subscribeNotificationsFromFirestore(callback: (notifications: any[]) => void): () => void {
+  logDiagnostic("info", "Attaching real-time listener to Firestore 'notifications/main'...");
+  try {
+    const notifDocRef = doc(db, "notifications", "main");
+    const unsubscribe = onSnapshot(notifDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && Array.isArray(data.notifications)) {
+          logDiagnostic("success", `[Firestore Realtime Notifications] Loaded ${data.notifications.length} broadcast notifications!`);
+          callback(data.notifications);
+        }
+      }
+    }, (err) => {
+      console.warn("[Firestore Notification Listener Warn]", err);
+    });
+    return unsubscribe;
+  } catch (err: any) {
+    console.warn("[Firestore Notification Subscription Fail]", err);
+    return () => {};
+  }
+}
+
 export function subscribeCoursesFromFirestore(callback: (coursesData: any[]) => void): () => void {
   logDiagnostic("info", "Attaching real-time listener to Firestore 'courses/main'...");
   try {

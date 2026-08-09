@@ -40,7 +40,8 @@ import {
   Presentation,
   FileSpreadsheet,
   Maximize2,
-  Lock
+  Lock,
+  Pencil
 } from "lucide-react";
 
 interface SubjectHubProps {
@@ -111,6 +112,105 @@ export default function SubjectHub({
 
   const closeYtVideo = () => {
     setActiveYtVideo(null);
+  };
+
+  // Unit Card Creator / Editor Modal State
+  const [isAddUnitModalOpen, setIsAddUnitModalOpen] = useState(false);
+  const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
+  const [newUnitNumber, setNewUnitNumber] = useState("");
+  const [newUnitName, setNewUnitName] = useState("");
+  const [newUnitDesc, setNewUnitDesc] = useState("");
+  const [newUnitTopics, setNewUnitTopics] = useState("");
+
+  const handleOpenAddUnitModal = () => {
+    setEditingUnit(null);
+    const nextNum = (displayUnits.length + 1).toString().padStart(2, "0");
+    setNewUnitNumber(nextNum);
+    setNewUnitName(`Unit ${displayUnits.length + 1}: `);
+    setNewUnitDesc("");
+    setNewUnitTopics("");
+    setIsAddUnitModalOpen(true);
+  };
+
+  const handleOpenEditUnitModal = (unitToEdit: Unit) => {
+    setEditingUnit(unitToEdit);
+    setNewUnitNumber(unitToEdit.number || "01");
+    setNewUnitName(unitToEdit.name);
+    setNewUnitDesc(unitToEdit.description || "");
+    setNewUnitTopics(unitToEdit.topics ? unitToEdit.topics.join(", ") : "");
+    setIsAddUnitModalOpen(true);
+  };
+
+  const handleSaveUnitCard = () => {
+    if (!newUnitName.trim()) {
+      alert("Please enter a Unit Name!");
+      return;
+    }
+
+    const topicsArray = newUnitTopics
+      .split(",")
+      .map(t => t.trim())
+      .filter(Boolean);
+
+    let updatedUnits: Unit[] = [];
+    const existingUnits = subject.units && subject.units.length > 0 ? [...subject.units] : [...displayUnits];
+
+    if (editingUnit) {
+      // Edit existing unit
+      updatedUnits = existingUnits.map(u => {
+        if (u.id === editingUnit.id) {
+          return {
+            ...u,
+            number: newUnitNumber.trim() || u.number,
+            name: newUnitName.trim(),
+            description: newUnitDesc.trim() || u.description,
+            topics: topicsArray.length > 0 ? topicsArray : u.topics
+          };
+        }
+        return u;
+      });
+    } else {
+      // Add new unit
+      const newUnitCard: Unit = {
+        id: `unit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        number: newUnitNumber.trim() || `0${displayUnits.length + 1}`,
+        name: newUnitName.trim(),
+        description: newUnitDesc.trim() || `Comprehensive syllabus materials for ${newUnitName.trim()}`,
+        masteryPercent: 0,
+        status: "In Progress",
+        topics: topicsArray,
+        materials: [],
+        importantQuestions: [],
+        youtubeLinks: []
+      };
+      updatedUnits = [...existingUnits, newUnitCard];
+    }
+
+    const updatedSubject: Subject = {
+      ...subject,
+      units: updatedUnits,
+      modulesCount: updatedUnits.length
+    };
+
+    onUpdateSubject(updatedSubject);
+    setIsAddUnitModalOpen(false);
+    setEditingUnit(null);
+    alert(editingUnit ? `Unit "${newUnitName.trim()}" successfully updated! 🥕` : `New Unit Card "${newUnitName.trim()}" added and synchronized across devices! 🥕`);
+  };
+
+  const handleDeleteUnitCard = (unitToDelete: Unit) => {
+    if (!window.confirm(`Are you sure you want to delete "${unitToDelete.name}"? This action cannot be undone.`)) return;
+
+    const existingUnits = subject.units && subject.units.length > 0 ? [...subject.units] : [...displayUnits];
+    const updatedUnits = existingUnits.filter(u => u.id !== unitToDelete.id);
+
+    const updatedSubject: Subject = {
+      ...subject,
+      units: updatedUnits,
+      modulesCount: updatedUnits.length
+    };
+
+    onUpdateSubject(updatedSubject);
   };
 
   // Material Blob Resolution State
@@ -310,9 +410,23 @@ export default function SubjectHub({
     return downloadedMaterialIds.includes(material.id) || downloadedMaterialIds.includes(material.name);
   };
 
+  // Helper to trigger browser anchor download
+  const triggerAnchorDownload = (url: string, fileName: string) => {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      if (document.body.contains(link)) {
+        document.body.removeChild(link);
+      }
+    }, 200);
+  };
+
   // Perform actual file download
   const executeDownload = async (material: StudyMaterial) => {
-    markMaterialAsDownloaded(material.id, material.name);
     try {
       let downloadUrl = activeBlobUrl || material.details || "";
 
@@ -329,28 +443,90 @@ export default function SubjectHub({
           const blob = base64ToBlob(dbData, material.type === "pdf" ? "application/pdf" : "application/octet-stream");
           downloadUrl = URL.createObjectURL(blob);
         }
-      } else if (downloadUrl.startsWith("data:")) {
-        const blob = base64ToBlob(downloadUrl, material.type === "pdf" ? "application/pdf" : "application/octet-stream");
-        downloadUrl = URL.createObjectURL(blob);
       }
 
-      if (downloadUrl.startsWith("blob:") || downloadUrl.startsWith("/api/files/") || downloadUrl.startsWith("http")) {
-        const link = document.createElement("a");
-        link.href = downloadUrl;
-        link.download = material.name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      // Format filename ensuring proper PDF/file extension
+      let fileName = material.name.trim();
+      const isPdf = material.type === "pdf" || fileName.toLowerCase().endsWith(".pdf") || (typeof material.details === "string" && material.details.includes("%PDF"));
+      if (isPdf && !fileName.toLowerCase().endsWith(".pdf")) {
+        fileName += ".pdf";
+      }
+
+      // Case 1: Data URL (base64)
+      if (typeof downloadUrl === "string" && downloadUrl.startsWith("data:")) {
+        const blob = base64ToBlob(downloadUrl, isPdf ? "application/pdf" : "application/octet-stream");
+        const blobUrl = URL.createObjectURL(blob);
+        triggerAnchorDownload(blobUrl, fileName);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        markMaterialAsDownloaded(material.id, material.name);
+        return;
+      }
+
+      // Case 2: Blob URL
+      if (typeof downloadUrl === "string" && downloadUrl.startsWith("blob:")) {
+        triggerAnchorDownload(downloadUrl, fileName);
+        markMaterialAsDownloaded(material.id, material.name);
+        return;
+      }
+
+      // Case 3: HTTP / HTTPS or /api/files/ server URLs - Fetch as Blob to force device download
+      if (typeof downloadUrl === "string" && (downloadUrl.startsWith("http") || downloadUrl.startsWith("/api/files/"))) {
+        try {
+          const response = await fetch(downloadUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            triggerAnchorDownload(blobUrl, fileName);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+            markMaterialAsDownloaded(material.id, material.name);
+            return;
+          }
+        } catch (fetchErr) {
+          console.warn("[Download Fetch Warning] Falling back to direct link download:", fetchErr);
+        }
+
+        // Direct anchor fallback
+        triggerAnchorDownload(downloadUrl, fileName);
+        markMaterialAsDownloaded(material.id, material.name);
+        return;
+      }
+
+      // Case 4: Text/Markdown/Notes details content
+      if (typeof material.details === "string" && material.details.trim().length > 0) {
+        let blob: Blob;
+        if (isPdf) {
+          // Wrap text in formatted printable HTML document so users can view or save as PDF
+          const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${material.name}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; max-width: 800px; margin: 0 auto; }
+    h1 { color: #95491a; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 24px; font-size: 24px; }
+    pre { background: #f8fafc; padding: 20px; border-radius: 12px; font-family: monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; border: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <h1>${material.name}</h1>
+  <div><pre>${material.details.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre></div>
+</body>
+</html>`;
+          blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
+          if (!fileName.toLowerCase().endsWith(".html") && !fileName.toLowerCase().endsWith(".pdf")) {
+            fileName += ".html";
+          }
+        } else {
+          blob = new Blob([material.details], { type: "text/plain;charset=utf-8" });
+          if (!fileName.includes(".")) fileName += ".txt";
+        }
+
+        const blobUrl = URL.createObjectURL(blob);
+        triggerAnchorDownload(blobUrl, fileName);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        markMaterialAsDownloaded(material.id, material.name);
       } else {
-        const blob = new Blob([material.details || ""], { type: "text/plain;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = material.name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        alert(`No downloadable content available for "${material.name}".`);
       }
     } catch (err) {
       console.error("Failed to download file:", err);
@@ -1086,21 +1262,47 @@ export default function SubjectHub({
             </h4>
           </div>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleToggleUnitStatus(unit.id);
-            }}
-            className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
-              isMastered ? "bg-[#4CAF50]/15 border-[#4CAF50] text-[#4CAF50]" :
-              isInProgress ? "bg-[#EEE4DA] border-[#A67C52] text-[#561C24]" :
-              "bg-[#F3ECE5] border-[#D8C4AC] text-[#8B6B52]"
-            }`}
-            title="Click to toggle study progress status"
-          >
-            {isMastered ? "Mastered" : isInProgress ? "Studying" : "Locked"}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleUnitStatus(unit.id);
+              }}
+              className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
+                isMastered ? "bg-[#4CAF50]/15 border-[#4CAF50] text-[#4CAF50]" :
+                isInProgress ? "bg-[#EEE4DA] border-[#A67C52] text-[#561C24]" :
+                "bg-[#F3ECE5] border-[#D8C4AC] text-[#8B6B52]"
+              }`}
+              title="Click to toggle study progress status"
+            >
+              {isMastered ? "Mastered" : isInProgress ? "Studying" : "Locked"}
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenEditUnitModal(unit);
+              }}
+              className="p-1.5 text-gray-400 hover:text-[#95491a] hover:bg-[#f8e6cb] rounded-lg transition-colors cursor-pointer"
+              title="Edit Unit Card"
+            >
+              <Pencil size={13} />
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteUnitCard(unit);
+              }}
+              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+              title="Delete Unit Card"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
         </div>
 
         <p className="text-[#4E342E] text-xs leading-relaxed mb-4">
@@ -2119,8 +2321,33 @@ export default function SubjectHub({
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {displayUnits.map((unit) => renderUnitCard(unit))}
+              <div className="space-y-4">
+                <div className="flex flex-wrap justify-between items-center gap-3 bg-[#fff8f3] p-4 rounded-2xl border border-[#dac1c1]/40">
+                  <div>
+                    <h4 className="font-extrabold text-sm text-[#40010d] flex items-center gap-2">
+                      <span>Syllabus Units & Modules</span>
+                      <span className="text-[10px] bg-[#f8e6cb] text-[#95491a] px-2.5 py-0.5 rounded-full font-bold">
+                        {displayUnits.length} Units
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-[#877272] mt-0.5">
+                      Unit cards display course topics, materials, and questions. Click below to add new unit cards.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenAddUnitModal}
+                    className="bg-[#95491a] hover:bg-[#7a2c35] text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <Plus size={15} />
+                    <span>Add New Unit Card</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {displayUnits.map((unit) => renderUnitCard(unit))}
+                </div>
               </div>
             )}
             {false && (() => { return null; return subject.units.map((unit) => {
@@ -3444,6 +3671,106 @@ export default function SubjectHub({
             </motion.div>
           </div>
         )}
+        {/* Add / Edit Unit Card Modal */}
+        {isAddUnitModalOpen && (
+          <div className="fixed inset-0 z-50 bg-[#40010d]/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#fff8f3] w-full max-w-lg rounded-3xl p-6 shadow-2xl relative border border-[#dac1c1]/40"
+            >
+              <div className="flex justify-between items-center border-b border-[#dac1c1]/30 pb-4 mb-5">
+                <h3 className="font-sans text-lg font-extrabold text-[#40010d] flex items-center gap-2">
+                  {editingUnit ? "Edit Unit Card" : "Add New Unit Card"} <Sparkles size={18} className="text-[#fd9b65]" />
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsAddUnitModalOpen(false)}
+                  className="p-1.5 hover:bg-[#f8e6cb] rounded-full text-[#877272] hover:text-[#40010d] transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={(e) => { e.preventDefault(); handleSaveUnitCard(); }} className="space-y-4 text-left font-sans">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-[#544243] mb-1.5">
+                      Unit Number
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 05"
+                      value={newUnitNumber}
+                      onChange={(e) => setNewUnitNumber(e.target.value)}
+                      className="w-full bg-white border border-[#dac1c1] px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[#fd9b65]"
+                      maxLength={10}
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-[#544243] mb-1.5">
+                      Unit Name *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Unit 5: Distributed Systems"
+                      value={newUnitName}
+                      onChange={(e) => setNewUnitName(e.target.value)}
+                      className="w-full bg-white border border-[#dac1c1] px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[#fd9b65]"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#544243] mb-1.5">
+                    Unit Description
+                  </label>
+                  <textarea
+                    placeholder="Brief overview of concepts covered in this unit..."
+                    value={newUnitDesc}
+                    onChange={(e) => setNewUnitDesc(e.target.value)}
+                    rows={3}
+                    className="w-full bg-white border border-[#dac1c1] px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[#fd9b65] resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#544243] mb-1.5">
+                    Core Topics (Optional, separated by commas)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Microservices, Consensus Algorithms, Fault Tolerance"
+                    value={newUnitTopics}
+                    onChange={(e) => setNewUnitTopics(e.target.value)}
+                    className="w-full bg-white border border-[#dac1c1] px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[#fd9b65]"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-3 border-t border-[#dac1c1]/30">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddUnitModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-[#877272] hover:bg-[#f8e6cb] transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-[#95491a] hover:bg-[#7a2c35] text-white font-bold text-xs rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Save size={14} />
+                    <span>{editingUnit ? "Save Changes" : "Create Unit Card"}</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
       </AnimatePresence>
 
     </div>
