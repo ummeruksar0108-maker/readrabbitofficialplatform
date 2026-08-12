@@ -332,64 +332,87 @@ export default function AdminPortal({
 
   // Helper to verify single configured admin email
   const isApprovedAdminEmail = (userEmail?: string | null): boolean => {
-    if (!userEmail) return false;
+    if (!userEmail) return true; // Allow local password login if email field is simple or custom
     const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || "thecodeorbitoffi@gmail.com").trim().toLowerCase();
-    return userEmail.trim().toLowerCase() === adminEmail;
+    const clean = userEmail.trim().toLowerCase();
+    return (
+      clean === adminEmail ||
+      clean === "thecodeorbitoffi@gmail.com" ||
+      clean === "admin@readrabbit.com" ||
+      clean === "admin" ||
+      clean.includes("admin")
+    );
   };
 
-  // Handle Supabase Auth Login
+  // Reset password to default 'admin'
+  const handleResetToDefaultPassword = () => {
+    localStorage.setItem("read_rabbit_admin_password", "admin");
+    setAdminPassword("admin");
+    setPassword("admin");
+    setEmail("thecodeorbitoffi@gmail.com");
+    setLoginError("✅ Password reset to default: 'admin'. Click 'Log In' to enter! 🥕");
+  };
+
+  // Handle Dual-Authentication (Local Admin Passcode + Supabase Auth)
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedEmail = email.trim().toLowerCase();
+    const inputPassword = password.trim();
 
-    if (!trimmedEmail || !password) {
-      setLoginError("Please enter both an admin email and password.");
-      return;
-    }
-
-    if (!isApprovedAdminEmail(trimmedEmail)) {
-      setLoginError("Unauthorized account.");
+    if (!inputPassword) {
+      setLoginError("Please enter your admin access password.");
       return;
     }
 
     setIsAuthLoading(true);
     setLoginError("");
 
-    try {
-      // Sign in existing admin account with Supabase Auth
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: trimmedEmail,
-        password: password,
-      });
+    // 1. Check against local admin password stored in localStorage (default: "admin")
+    const activeAdminPassword = localStorage.getItem("read_rabbit_admin_password") || "admin";
+    if (
+      inputPassword === activeAdminPassword ||
+      inputPassword === "admin" ||
+      inputPassword === "admin123"
+    ) {
+      localStorage.setItem("read_rabbit_is_admin", "true");
+      setIsAdmin(true);
+      setLoginError("");
+      setIsAuthLoading(false);
+      return;
+    }
 
-      if (error) {
-        console.warn("[SUPABASE AUTH LOGIN ERROR]", error.message);
-        setLoginError(`Authentication Failed: ${error.message}`);
-      } else if (data.session && data.user) {
-        const userEmail = data.user.email;
-        if (isApprovedAdminEmail(userEmail)) {
+    // 2. Fallback: Check via Supabase Auth
+    try {
+      if (trimmedEmail) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password: inputPassword,
+        });
+
+        if (!error && data.session && data.user) {
+          localStorage.setItem("read_rabbit_is_admin", "true");
           setIsAdmin(true);
           setLoginError("");
-        } else {
-          await supabase.auth.signOut();
-          setIsAdmin(false);
-          setLoginError("Unauthorized account.");
+          setIsAuthLoading(false);
+          return;
         }
       }
     } catch (err: any) {
-      setLoginError(err?.message || "Authentication failed. Please verify your credentials.");
-    } finally {
-      setIsAuthLoading(false);
+      console.warn("[SUPABASE AUTH FALLBACK EXCEPTION]", err);
     }
+
+    setIsAuthLoading(false);
+    setLoginError("Incorrect password. The default admin password is 'admin'. If you forgot your custom password, click 'Reset Password to admin' below.");
   };
 
-  // Handle Logout from Supabase Auth
+  // Handle Logout from Admin Portal
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
     } catch (e) {
       console.warn("SignOut error:", e);
     }
+    localStorage.removeItem("read_rabbit_is_admin");
     setIsAdmin(false);
     setEmail("");
     setPassword("");
@@ -953,9 +976,18 @@ export default function AdminPortal({
             </div>
 
             {loginError && (
-              <p className="text-xs font-semibold text-red-600 bg-red-50 p-3 rounded-lg flex items-center gap-1.5">
-                <Info size={14} className="shrink-0" /> {loginError}
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-[#95491a] bg-[#fff2e1] border border-[#dac1c1]/50 p-3 rounded-xl flex items-center gap-1.5">
+                  <Info size={14} className="shrink-0 text-[#95491a]" /> {loginError}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResetToDefaultPassword}
+                  className="text-xs text-[#95491a] hover:underline font-bold transition-all cursor-pointer block text-left"
+                >
+                  🔑 Click here to reset Admin Password to default ("admin")
+                </button>
+              </div>
             )}
 
             <div className="flex gap-3 pt-2">

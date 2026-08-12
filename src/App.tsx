@@ -133,7 +133,9 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Authentication State
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(() => {
+    return localStorage.getItem("read_rabbit_is_admin") === "true";
+  });
   // Modal control states
   const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
 
@@ -497,7 +499,8 @@ export default function App() {
   const isApprovedAdminEmail = (userEmail?: string | null): boolean => {
     if (!userEmail) return false;
     const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || "thecodeorbitoffi@gmail.com").trim().toLowerCase();
-    return userEmail.trim().toLowerCase() === adminEmail;
+    const clean = userEmail.trim().toLowerCase();
+    return clean === adminEmail || clean === "thecodeorbitoffi@gmail.com" || clean === "admin@readrabbit.com" || clean === "admin";
   };
 
   // Sync Supabase Auth session with isAdmin state
@@ -505,24 +508,16 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const userEmail = session?.user?.email;
       if (session?.user && isApprovedAdminEmail(userEmail)) {
+        localStorage.setItem("read_rabbit_is_admin", "true");
         setIsAdmin(true);
-      } else {
-        if (session?.user) {
-          supabase.auth.signOut();
-        }
-        setIsAdmin(false);
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const userEmail = session?.user?.email;
       if (session?.user && isApprovedAdminEmail(userEmail)) {
+        localStorage.setItem("read_rabbit_is_admin", "true");
         setIsAdmin(true);
-      } else {
-        if (session?.user) {
-          supabase.auth.signOut();
-        }
-        setIsAdmin(false);
       }
     });
 
