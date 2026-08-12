@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Subject, Unit, StudyMaterial, YouTubeReference } from "../types";
 import { getFileFromIndexedDB, base64ToBlob } from "../lib/fileStorage";
@@ -123,6 +123,10 @@ export default function SubjectHub({
   const [newUnitTopics, setNewUnitTopics] = useState("");
 
   const handleOpenAddUnitModal = () => {
+    if (!isAdmin) {
+      alert("Only administrators can add unit cards.");
+      return;
+    }
     setEditingUnit(null);
     const nextNum = (displayUnits.length + 1).toString().padStart(2, "0");
     setNewUnitNumber(nextNum);
@@ -133,6 +137,10 @@ export default function SubjectHub({
   };
 
   const handleOpenEditUnitModal = (unitToEdit: Unit) => {
+    if (!isAdmin) {
+      alert("Only administrators can edit unit cards.");
+      return;
+    }
     setEditingUnit(unitToEdit);
     setNewUnitNumber(unitToEdit.number || "01");
     setNewUnitName(unitToEdit.name);
@@ -142,6 +150,10 @@ export default function SubjectHub({
   };
 
   const handleSaveUnitCard = () => {
+    if (!isAdmin) {
+      alert("Only administrators can add or edit unit cards.");
+      return;
+    }
     if (!newUnitName.trim()) {
       alert("Please enter a Unit Name!");
       return;
@@ -199,6 +211,10 @@ export default function SubjectHub({
   };
 
   const handleDeleteUnitCard = (unitToDelete: Unit) => {
+    if (!isAdmin) {
+      alert("Only administrators can delete unit cards.");
+      return;
+    }
     if (!window.confirm(`Are you sure you want to delete "${unitToDelete.name}"? This action cannot be undone.`)) return;
 
     const existingUnits = subject.units && subject.units.length > 0 ? [...subject.units] : [...displayUnits];
@@ -378,7 +394,12 @@ export default function SubjectHub({
     return () => window.removeEventListener("popstate", handleHubPopState);
   }, [activeYtVideo, activeMaterial, selectedUnit, isPlayingQuiz]);
 
-  // Downloaded Files Tracking State
+  // Download Status Map using React Ref and State for consistent UI tracking and stream verification
+  type DownloadStatus = "idle" | "downloading" | "completed" | "error";
+
+  const downloadStatusRef = useRef<Record<string, DownloadStatus>>({});
+  const [downloadStatusMap, setDownloadStatusMap] = useState<Record<string, DownloadStatus>>({});
+
   const [downloadedMaterialIds, setDownloadedMaterialIds] = useState<string[]>(() => {
     const saved = localStorage.getItem("read_rabbit_downloaded_materials_v1");
     if (saved) {
@@ -392,22 +413,62 @@ export default function SubjectHub({
   });
 
   const [downloadPromptMaterial, setDownloadPromptMaterial] = useState<StudyMaterial | null>(null);
+  const [downloadingMaterialId, setDownloadingMaterialId] = useState<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem("read_rabbit_downloaded_materials_v1", JSON.stringify(downloadedMaterialIds));
   }, [downloadedMaterialIds]);
 
-  const markMaterialAsDownloaded = (mId: string, mName: string) => {
-    setDownloadedMaterialIds((prev) => {
-      const list = new Set(prev);
-      list.add(mId);
-      list.add(mName);
-      return Array.from(list);
+  // Sync initial stored downloaded material IDs into downloadStatusMap
+  useEffect(() => {
+    const initialMap: Record<string, DownloadStatus> = {};
+    downloadedMaterialIds.forEach((id) => {
+      initialMap[id] = "completed";
     });
+    downloadStatusRef.current = { ...initialMap, ...downloadStatusRef.current };
+    setDownloadStatusMap((prev) => ({ ...initialMap, ...prev }));
+  }, []);
+
+  const setMaterialDownloadStatus = (mId: string, mName: string, status: DownloadStatus) => {
+    downloadStatusRef.current[mId] = status;
+    downloadStatusRef.current[mName] = status;
+
+    setDownloadStatusMap((prev) => ({
+      ...prev,
+      [mId]: status,
+      [mName]: status,
+    }));
+
+    if (status === "completed") {
+      setDownloadedMaterialIds((prev) => {
+        const list = new Set(prev);
+        list.add(mId);
+        list.add(mName);
+        return Array.from(list);
+      });
+    }
+  };
+
+  const getDownloadStatus = (material: StudyMaterial): DownloadStatus => {
+    if (downloadingMaterialId === material.id) {
+      return "downloading";
+    }
+
+    const refStatus = downloadStatusRef.current[material.id] || downloadStatusRef.current[material.name];
+    if (refStatus) return refStatus;
+
+    const stateStatus = downloadStatusMap[material.id] || downloadStatusMap[material.name];
+    if (stateStatus) return stateStatus;
+
+    if (downloadedMaterialIds.includes(material.id) || downloadedMaterialIds.includes(material.name)) {
+      return "completed";
+    }
+
+    return "idle";
   };
 
   const isMaterialDownloaded = (material: StudyMaterial) => {
-    return downloadedMaterialIds.includes(material.id) || downloadedMaterialIds.includes(material.name);
+    return getDownloadStatus(material) === "completed";
   };
 
   // Helper to trigger browser anchor download
@@ -415,6 +476,7 @@ export default function SubjectHub({
     const link = document.createElement("a");
     link.href = url;
     link.download = fileName;
+    link.setAttribute("download", fileName);
     link.style.display = "none";
     document.body.appendChild(link);
     link.click();
@@ -422,13 +484,19 @@ export default function SubjectHub({
       if (document.body.contains(link)) {
         document.body.removeChild(link);
       }
-    }, 200);
+    }, 1000);
   };
 
-  // Perform actual file download
+  // Perform actual file download with stream completion validation
   const executeDownload = async (material: StudyMaterial) => {
+    setDownloadingMaterialId(material.id);
+    setMaterialDownloadStatus(material.id, material.name, "downloading");
+
     try {
-      let downloadUrl = activeBlobUrl || material.details || "";
+      // Ensure we resolve strictly for this material (avoid stale activeBlobUrl leakage from other materials)
+      let downloadUrl = (activeMaterial && activeMaterial.id === material.id && activeBlobUrl) 
+        ? activeBlobUrl 
+        : (material.details || material.publicUrl || "");
 
       if (downloadUrl.startsWith("firestore_file://")) {
         downloadUrl = await getFileContentFromCloud(downloadUrl);
@@ -445,6 +513,10 @@ export default function SubjectHub({
         }
       }
 
+      if (!downloadUrl || (typeof downloadUrl === "string" && downloadUrl.trim().length === 0)) {
+        throw new Error("No valid download source URL or content found for this material.");
+      }
+
       // Format filename ensuring proper PDF/file extension
       let fileName = material.name.trim();
       const isPdf = material.type === "pdf" || fileName.toLowerCase().endsWith(".pdf") || (typeof material.details === "string" && material.details.includes("%PDF"));
@@ -452,50 +524,29 @@ export default function SubjectHub({
         fileName += ".pdf";
       }
 
+      let downloadedBlob: Blob | null = null;
+
       // Case 1: Data URL (base64)
       if (typeof downloadUrl === "string" && downloadUrl.startsWith("data:")) {
-        const blob = base64ToBlob(downloadUrl, isPdf ? "application/pdf" : "application/octet-stream");
-        const blobUrl = URL.createObjectURL(blob);
-        triggerAnchorDownload(blobUrl, fileName);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-        markMaterialAsDownloaded(material.id, material.name);
-        return;
+        downloadedBlob = base64ToBlob(downloadUrl, isPdf ? "application/pdf" : "application/octet-stream");
       }
-
       // Case 2: Blob URL
-      if (typeof downloadUrl === "string" && downloadUrl.startsWith("blob:")) {
-        triggerAnchorDownload(downloadUrl, fileName);
-        markMaterialAsDownloaded(material.id, material.name);
-        return;
+      else if (typeof downloadUrl === "string" && downloadUrl.startsWith("blob:")) {
+        const resp = await fetch(downloadUrl);
+        if (!resp.ok) throw new Error("Failed to read blob stream.");
+        downloadedBlob = await resp.blob();
       }
-
-      // Case 3: HTTP / HTTPS or /api/files/ server URLs - Fetch as Blob to force device download
-      if (typeof downloadUrl === "string" && (downloadUrl.startsWith("http") || downloadUrl.startsWith("/api/files/"))) {
-        try {
-          const response = await fetch(downloadUrl);
-          if (response.ok) {
-            const blob = await response.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            triggerAnchorDownload(blobUrl, fileName);
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-            markMaterialAsDownloaded(material.id, material.name);
-            return;
-          }
-        } catch (fetchErr) {
-          console.warn("[Download Fetch Warning] Falling back to direct link download:", fetchErr);
+      // Case 3: HTTP / HTTPS or /api/files/ server URLs - Fetch as Blob to force device download and verify stream
+      else if (typeof downloadUrl === "string" && (downloadUrl.startsWith("http") || downloadUrl.startsWith("/api/files/"))) {
+        const response = await fetch(downloadUrl);
+        if (!response.ok) {
+          throw new Error(`Server returned HTTP ${response.status} when fetching file.`);
         }
-
-        // Direct anchor fallback
-        triggerAnchorDownload(downloadUrl, fileName);
-        markMaterialAsDownloaded(material.id, material.name);
-        return;
+        downloadedBlob = await response.blob();
       }
-
       // Case 4: Text/Markdown/Notes details content
-      if (typeof material.details === "string" && material.details.trim().length > 0) {
-        let blob: Blob;
+      else if (typeof material.details === "string" && material.details.trim().length > 0) {
         if (isPdf) {
-          // Wrap text in formatted printable HTML document so users can view or save as PDF
           const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
@@ -512,39 +563,40 @@ export default function SubjectHub({
   <div><pre>${material.details.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre></div>
 </body>
 </html>`;
-          blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
+          downloadedBlob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
           if (!fileName.toLowerCase().endsWith(".html") && !fileName.toLowerCase().endsWith(".pdf")) {
             fileName += ".html";
           }
         } else {
-          blob = new Blob([material.details], { type: "text/plain;charset=utf-8" });
+          downloadedBlob = new Blob([material.details], { type: "text/plain;charset=utf-8" });
           if (!fileName.includes(".")) fileName += ".txt";
         }
+      }
 
-        const blobUrl = URL.createObjectURL(blob);
-        triggerAnchorDownload(blobUrl, fileName);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-        markMaterialAsDownloaded(material.id, material.name);
-      } else {
-        alert(`No downloadable content available for "${material.name}".`);
+      // Verify stream completion: blob must be non-null and have non-zero size
+      if (!downloadedBlob || downloadedBlob.size === 0) {
+        throw new Error("File stream returned zero bytes or unreadable payload.");
       }
+
+      // Trigger browser download with completed blob URL
+      const blobUrl = URL.createObjectURL(downloadedBlob);
+      triggerAnchorDownload(blobUrl, fileName);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
+
+      // Only update download status map to completed AFTER successful file stream completion
+      setMaterialDownloadStatus(material.id, material.name, "completed");
     } catch (err) {
-      console.error("Failed to download file:", err);
-      if (material.details?.startsWith("/api/files/")) {
-        window.open(material.details, "_blank");
-      } else {
-        alert(`Could not trigger automated download for "${material.name}".`);
-      }
+      console.error("[Download Stream Error]", err);
+      setMaterialDownloadStatus(material.id, material.name, "error");
+      alert(`Could not complete download for "${material.name}". Stream incomplete or file unavailable.`);
+    } finally {
+      setDownloadingMaterialId(null);
     }
   };
 
-  // Download File Handler (triggers prompt if already downloaded)
+  // Download File Handler (Always triggers real download directly to device)
   const handleDownloadFile = async (material: StudyMaterial) => {
-    if (isMaterialDownloaded(material)) {
-      setDownloadPromptMaterial(material);
-    } else {
-      executeDownload(material);
-    }
+    executeDownload(material);
   };
 
   // Copy Content Helper
@@ -1279,29 +1331,33 @@ export default function SubjectHub({
               {isMastered ? "Mastered" : isInProgress ? "Studying" : "Locked"}
             </button>
 
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleOpenEditUnitModal(unit);
-              }}
-              className="p-1.5 text-gray-400 hover:text-[#95491a] hover:bg-[#f8e6cb] rounded-lg transition-colors cursor-pointer"
-              title="Edit Unit Card"
-            >
-              <Pencil size={13} />
-            </button>
+            {isAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenEditUnitModal(unit);
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-[#95491a] hover:bg-[#f8e6cb] rounded-lg transition-colors cursor-pointer"
+                  title="Edit Unit Card"
+                >
+                  <Pencil size={13} />
+                </button>
 
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteUnitCard(unit);
-              }}
-              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-              title="Delete Unit Card"
-            >
-              <Trash2 size={13} />
-            </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteUnitCard(unit);
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                  title="Delete Unit Card"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -1367,35 +1423,58 @@ export default function SubjectHub({
                           <span>View</span>
                         </button>
 
-                        {isMaterialDownloaded(m) ? (
-                          <button 
+                        {(() => {
+                          const status = getDownloadStatus(m);
+                          return (
+                            <button 
+                              type="button"
+                              onClick={() => handleDownloadFile(m)}
+                              disabled={status === "downloading"}
+                              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50 ${
+                                status === "completed"
+                                  ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300"
+                                  : status === "error"
+                                  ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300"
+                                  : "bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white"
+                              }`}
+                              title={status === "completed" ? "✓ Downloaded! Click to re-download" : status === "error" ? "Download failed. Click to retry" : "Download file directly to device"}
+                            >
+                              {status === "downloading" ? (
+                                <>
+                                  <div className="w-3 h-3 border-2 border-amber-700 border-t-transparent rounded-full animate-spin" />
+                                  <span>Downloading...</span>
+                                </>
+                              ) : status === "completed" ? (
+                                <>
+                                  <FileCheck size={12} className="text-emerald-700" />
+                                  <span>✓ Downloaded</span>
+                                </>
+                              ) : status === "error" ? (
+                                <>
+                                  <Download size={12} className="text-red-700" />
+                                  <span>Retry</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Download size={12} />
+                                  <span>Download</span>
+                                </>
+                              )}
+                            </button>
+                          );
+                        })()}
+
+                        {isAdmin && (
+                          <button
                             type="button"
-                            onClick={() => setDownloadPromptMaterial(m)}
-                            className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                            onClick={() => handleManualSaveToWeb(m.name)}
+                            disabled={isSavingWeb}
+                            className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
                           >
-                            <FileCheck size={12} className="text-emerald-700" />
-                            <span>✓ Downloaded</span>
-                          </button>
-                        ) : (
-                          <button 
-                            type="button"
-                            onClick={() => handleDownloadFile(m)}
-                            className="px-2.5 py-1.5 bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                          >
-                            <Download size={12} />
-                            <span>Download</span>
+                            <Save size={12} />
+                            <span>Save</span>
                           </button>
                         )}
-
-                        <button
-                          type="button"
-                          onClick={() => handleManualSaveToWeb(m.name)}
-                          disabled={isSavingWeb}
-                          className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
-                        >
-                          <Save size={12} />
-                          <span>Save</span>
-                        </button>
 
                         {isAdmin && (
                           <button
@@ -1584,35 +1663,58 @@ export default function SubjectHub({
                             <span>View</span>
                           </button>
 
-                          {isMaterialDownloaded(m) ? (
-                            <button 
+                          {(() => {
+                            const status = getDownloadStatus(m);
+                            return (
+                              <button 
+                                type="button"
+                                onClick={() => handleDownloadFile(m)}
+                                disabled={status === "downloading"}
+                                className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50 ${
+                                  status === "completed"
+                                    ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300"
+                                    : status === "error"
+                                    ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300"
+                                    : "bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white"
+                                }`}
+                                title={status === "completed" ? "✓ Downloaded! Click to re-download" : status === "error" ? "Download failed. Click to retry" : "Download file directly to device"}
+                              >
+                                {status === "downloading" ? (
+                                  <>
+                                    <div className="w-3 h-3 border-2 border-amber-700 border-t-transparent rounded-full animate-spin" />
+                                    <span>Downloading...</span>
+                                  </>
+                                ) : status === "completed" ? (
+                                  <>
+                                    <FileCheck size={12} className="text-emerald-700" />
+                                    <span>✓ Downloaded</span>
+                                  </>
+                                ) : status === "error" ? (
+                                  <>
+                                    <Download size={12} className="text-red-700" />
+                                    <span>Retry</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download size={12} />
+                                    <span>Download</span>
+                                  </>
+                                )}
+                              </button>
+                            );
+                          })()}
+
+                          {isAdmin && (
+                            <button
                               type="button"
-                              onClick={() => setDownloadPromptMaterial(m)}
-                              className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                              onClick={() => handleManualSaveToWeb(m.name)}
+                              disabled={isSavingWeb}
+                              className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
                             >
-                              <FileCheck size={12} className="text-emerald-700" />
-                              <span>✓ Downloaded</span>
-                            </button>
-                          ) : (
-                            <button 
-                              type="button"
-                              onClick={() => handleDownloadFile(m)}
-                              className="px-2.5 py-1.5 bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                            >
-                              <Download size={12} />
-                              <span>Download</span>
+                              <Save size={12} />
+                              <span>Save</span>
                             </button>
                           )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleManualSaveToWeb(m.name)}
-                            disabled={isSavingWeb}
-                            className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
-                          >
-                            <Save size={12} />
-                            <span>Save</span>
-                          </button>
 
                           {isAdmin && (
                             <button
@@ -2144,35 +2246,58 @@ export default function SubjectHub({
                             <span>View</span>
                           </button>
 
-                          {isMaterialDownloaded(book) ? (
+                          {(() => {
+                            const status = getDownloadStatus(book);
+                            return (
+                              <button 
+                                type="button"
+                                onClick={() => handleDownloadFile(book)}
+                                disabled={status === "downloading"}
+                                className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50 ${
+                                  status === "completed"
+                                    ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300"
+                                    : status === "error"
+                                    ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300"
+                                    : "bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white"
+                                }`}
+                                title={status === "completed" ? "✓ Downloaded! Click to re-download" : status === "error" ? "Download failed. Click to retry" : "Download file directly to device"}
+                              >
+                                {status === "downloading" ? (
+                                  <>
+                                    <div className="w-3 h-3 border-2 border-amber-700 border-t-transparent rounded-full animate-spin" />
+                                    <span>Downloading...</span>
+                                  </>
+                                ) : status === "completed" ? (
+                                  <>
+                                    <FileCheck size={12} className="text-emerald-700" />
+                                    <span>✓ Downloaded</span>
+                                  </>
+                                ) : status === "error" ? (
+                                  <>
+                                    <Download size={12} className="text-red-700" />
+                                    <span>Retry</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download size={12} />
+                                    <span>Download</span>
+                                  </>
+                                )}
+                              </button>
+                            );
+                          })()}
+
+                          {isAdmin && (
                             <button
                               type="button"
-                              onClick={() => setDownloadPromptMaterial(book)}
-                              className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
+                              onClick={() => handleManualSaveToWeb(book.name)}
+                              disabled={isSavingWeb}
+                              className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
                             >
-                              <FileCheck size={12} className="text-emerald-700" />
-                              <span>✓ Downloaded</span>
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadFile(book)}
-                              className="px-2.5 py-1.5 bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                            >
-                              <Download size={12} />
-                              <span>Download</span>
+                              <Save size={12} />
+                              <span>Save</span>
                             </button>
                           )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleManualSaveToWeb(book.name)}
-                            disabled={isSavingWeb}
-                            className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
-                          >
-                            <Save size={12} />
-                            <span>Save</span>
-                          </button>
 
                           {isAdmin && (
                             <button
@@ -2335,14 +2460,16 @@ export default function SubjectHub({
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleOpenAddUnitModal}
-                    className="bg-[#95491a] hover:bg-[#7a2c35] text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
-                  >
-                    <Plus size={15} />
-                    <span>Add New Unit Card</span>
-                  </button>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={handleOpenAddUnitModal}
+                      className="bg-[#95491a] hover:bg-[#7a2c35] text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                    >
+                      <Plus size={15} />
+                      <span>Add New Unit Card</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2508,38 +2635,59 @@ export default function SubjectHub({
                                       <span>View Document</span>
                                     </button>
 
-                                    {isMaterialDownloaded(m) ? (
-                                      <button 
+                                    {(() => {
+                                      const status = getDownloadStatus(m);
+                                      return (
+                                        <button 
+                                          type="button"
+                                          onClick={() => handleDownloadFile(m)}
+                                          disabled={status === "downloading"}
+                                          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50 ${
+                                            status === "completed"
+                                              ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300"
+                                              : status === "error"
+                                              ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300"
+                                              : "bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white"
+                                          }`}
+                                          title={status === "completed" ? "✓ Downloaded! Click to re-download" : status === "error" ? "Download failed. Click to retry" : "Download file directly to device"}
+                                        >
+                                          {status === "downloading" ? (
+                                            <>
+                                              <div className="w-3 h-3 border-2 border-amber-700 border-t-transparent rounded-full animate-spin" />
+                                              <span>Downloading...</span>
+                                            </>
+                                          ) : status === "completed" ? (
+                                            <>
+                                              <FileCheck size={12} className="text-emerald-700" />
+                                              <span>✓ Downloaded</span>
+                                            </>
+                                          ) : status === "error" ? (
+                                            <>
+                                              <Download size={12} className="text-red-700" />
+                                              <span>Retry</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Download size={12} />
+                                              <span>Download</span>
+                                            </>
+                                          )}
+                                        </button>
+                                      );
+                                    })()}
+
+                                    {isAdmin && (
+                                      <button
                                         type="button"
-                                        onClick={() => setDownloadPromptMaterial(m)}
-                                        className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                                        title="Downloaded! Click to open from files or re-download"
+                                        onClick={() => handleManualSaveToWeb(m.name)}
+                                        disabled={isSavingWeb}
+                                        className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                                        title="Ensure file is permanently saved to Web Cloud"
                                       >
-                                        <FileCheck size={12} className="text-emerald-700" />
-                                        <span>✓ Downloaded</span>
-                                      </button>
-                                    ) : (
-                                      <button 
-                                        type="button"
-                                        onClick={() => handleDownloadFile(m)}
-                                        className="px-2.5 py-1.5 bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                                        title="Download file directly to device"
-                                      >
-                                        <Download size={12} />
-                                        <span>Download</span>
+                                        <Save size={12} />
+                                        <span>Save</span>
                                       </button>
                                     )}
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handleManualSaveToWeb(m.name)}
-                                      disabled={isSavingWeb}
-                                      className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
-                                      title="Ensure file is permanently saved to Web Cloud"
-                                    >
-                                      <Save size={12} />
-                                      <span>Save</span>
-                                    </button>
 
                                     {isAdmin && (
                                       <button
@@ -3152,25 +3300,46 @@ export default function SubjectHub({
                           {isPdf ? "View PDF" : isCode ? "View Code" : "View Notes"}
                         </button>
 
-                        {isMaterialDownloaded(material) ? (
-                          <button 
-                            type="button"
-                            onClick={() => setDownloadPromptMaterial(material)}
-                            className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-xl text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
-                          >
-                            <FileCheck size={12} className="text-emerald-700" />
-                            <span>✓ Downloaded</span>
-                          </button>
-                        ) : (
-                          <button 
-                            type="button"
-                            onClick={() => handleDownloadFile(material)}
-                            className="px-3 py-1.5 bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
-                          >
-                            <Download size={12} />
-                            <span>Download</span>
-                          </button>
-                        )}
+                        {(() => {
+                          const status = getDownloadStatus(material);
+                          return (
+                            <button 
+                              type="button"
+                              onClick={() => handleDownloadFile(material)}
+                              disabled={status === "downloading"}
+                              className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs disabled:opacity-50 ${
+                                status === "completed"
+                                  ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 font-extrabold"
+                                  : status === "error"
+                                  ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300 font-extrabold"
+                                  : "bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white"
+                              }`}
+                              title={status === "completed" ? "✓ Downloaded! Click to re-download" : status === "error" ? "Download failed. Click to retry" : "Download file directly to device"}
+                            >
+                              {status === "downloading" ? (
+                                <>
+                                  <div className="w-3 h-3 border-2 border-amber-700 border-t-transparent rounded-full animate-spin" />
+                                  <span>Downloading...</span>
+                                </>
+                              ) : status === "completed" ? (
+                                <>
+                                  <FileCheck size={12} className="text-emerald-700" />
+                                  <span>✓ Downloaded</span>
+                                </>
+                              ) : status === "error" ? (
+                                <>
+                                  <Download size={12} className="text-red-700" />
+                                  <span>Retry</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Download size={12} />
+                                  <span>Download</span>
+                                </>
+                              )}
+                            </button>
+                          );
+                        })()}
                         {isAdmin && (
                           <button
                             onClick={() => handleDeleteSubjectMaterial(material.id)}
@@ -3328,14 +3497,45 @@ export default function SubjectHub({
                 )}
 
                 {/* DOWNLOAD BUTTON */}
-                <button
-                  onClick={() => handleDownloadFile(activeMaterial)}
-                  className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
-                  title="Download File to Device"
-                >
-                  <Download size={14} />
-                  <span className="hidden sm:inline">Download</span>
-                </button>
+                {(() => {
+                  const status = getDownloadStatus(activeMaterial);
+                  return (
+                    <button
+                      onClick={() => handleDownloadFile(activeMaterial)}
+                      disabled={status === "downloading"}
+                      className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                        status === "completed"
+                          ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                          : status === "error"
+                          ? "bg-red-600 hover:bg-red-500 text-white"
+                          : "bg-white/10 hover:bg-white/20 text-white"
+                      }`}
+                      title="Download File to Device"
+                    >
+                      {status === "downloading" ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-amber-300 border-t-transparent rounded-full animate-spin" />
+                          <span className="hidden sm:inline">Downloading...</span>
+                        </>
+                      ) : status === "completed" ? (
+                        <>
+                          <FileCheck size={14} className="text-emerald-300" />
+                          <span className="hidden sm:inline">✓ Downloaded</span>
+                        </>
+                      ) : status === "error" ? (
+                        <>
+                          <Download size={14} className="text-red-300" />
+                          <span className="hidden sm:inline">Retry Download</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download size={14} />
+                          <span className="hidden sm:inline">Download</span>
+                        </>
+                      )}
+                    </button>
+                  );
+                })()}
 
                 {/* CLOSE BUTTON */}
                 <button

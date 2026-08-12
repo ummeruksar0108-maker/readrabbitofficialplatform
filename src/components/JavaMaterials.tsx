@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { StudyMaterial } from "../types";
 import {
@@ -13,6 +13,7 @@ import {
   Terminal,
   X,
   CheckCircle2,
+  FileCheck,
 } from "lucide-react";
 
 interface JavaMaterialsProps {
@@ -26,6 +27,25 @@ export default function JavaMaterials({
   onToggleBookmark,
   onSelectBreadcrumb,
 }: JavaMaterialsProps) {
+  // Download Status Map using React Ref and State for stream verification
+  type DownloadStatus = "idle" | "downloading" | "completed" | "error";
+  const downloadStatusRef = useRef<Record<string, DownloadStatus>>({});
+  const [downloadStatusMap, setDownloadStatusMap] = useState<Record<string, DownloadStatus>>({});
+
+  const setStatus = (id: string, name: string, status: DownloadStatus) => {
+    downloadStatusRef.current[id] = status;
+    downloadStatusRef.current[name] = status;
+    setDownloadStatusMap((prev) => ({
+      ...prev,
+      [id]: status,
+      [name]: status,
+    }));
+  };
+
+  const getStatus = (material: StudyMaterial): DownloadStatus => {
+    return downloadStatusMap[material.id] || downloadStatusRef.current[material.id] || "idle";
+  };
+
   // Download simulation states
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -42,6 +62,7 @@ export default function JavaMaterials({
   const handleDownload = async (material: StudyMaterial) => {
     if (downloadingId) return;
     setDownloadingId(material.id);
+    setStatus(material.id, material.name, "downloading");
     setDownloadProgress(20);
 
     try {
@@ -66,11 +87,16 @@ export default function JavaMaterials({
         blob = new Blob([u8arr], { type: "application/pdf" });
       } else if (downloadUrl.startsWith("http") || downloadUrl.startsWith("/api/files/")) {
         const res = await fetch(downloadUrl);
+        if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
         blob = await res.blob();
       } else {
         // Plain text / notes content
         blob = new Blob([material.details || `${material.name}\n\nJava Study Notes & Reference Material`], { type: "text/plain;charset=utf-8" });
         if (!fileName.endsWith(".txt") && !fileName.endsWith(".pdf")) fileName += ".txt";
+      }
+
+      if (!blob || blob.size === 0) {
+        throw new Error("File stream returned zero bytes.");
       }
 
       setDownloadProgress(90);
@@ -84,14 +110,17 @@ export default function JavaMaterials({
       document.body.removeChild(link);
 
       setDownloadProgress(100);
+      setStatus(material.id, material.name, "completed");
+
       setTimeout(() => {
         setDownloadingId(null);
         URL.revokeObjectURL(url);
       }, 500);
     } catch (err) {
       console.error("Download failed:", err);
+      setStatus(material.id, material.name, "error");
       setDownloadingId(null);
-      alert(`Could not download "${material.name}". Please try again.`);
+      alert(`Could not download "${material.name}". Stream incomplete.`);
     }
   };
 
@@ -205,17 +234,27 @@ export default function JavaMaterials({
                     <Bookmark size={18} className={pdf.isBookmarked ? "fill-[#fd9b65] text-[#95491a]" : ""} />
                   </button>
 
-                  <button
-                    onClick={() => handleDownload(pdf)}
-                    className="p-2 hover:bg-[#f8e6cb] rounded-full text-[#877272] hover:text-[#40010d] active:scale-90 transition-all cursor-pointer"
-                    title="Download Note"
-                  >
-                    {downloadingId === pdf.id ? (
-                      <span className="w-4 h-4 border-2 border-[#95491a] border-t-transparent rounded-full animate-spin block"></span>
-                    ) : (
-                      <Download size={18} />
-                    )}
-                  </button>
+                  {(() => {
+                    const st = getStatus(pdf);
+                    return (
+                      <button
+                        onClick={() => handleDownload(pdf)}
+                        disabled={st === "downloading"}
+                        className="p-2 hover:bg-[#f8e6cb] rounded-full text-[#877272] hover:text-[#40010d] active:scale-90 transition-all cursor-pointer disabled:opacity-50"
+                        title={st === "completed" ? "Downloaded" : st === "error" ? "Download Failed" : "Download Note"}
+                      >
+                        {st === "downloading" ? (
+                          <span className="w-4 h-4 border-2 border-[#95491a] border-t-transparent rounded-full animate-spin block" />
+                        ) : st === "completed" ? (
+                          <FileCheck size={18} className="text-emerald-700" />
+                        ) : st === "error" ? (
+                          <Download size={18} className="text-red-600" />
+                        ) : (
+                          <Download size={18} />
+                        )}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             ))}

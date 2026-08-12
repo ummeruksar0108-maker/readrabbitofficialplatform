@@ -73,11 +73,12 @@ export default function App() {
     };
   }, []);
 
-  // Splash Screen State - restore from Hash or LocalStorage (defaulting to true on first visit)
+  // Splash Screen State - always land on entry page when website is opened
   const [isSplash, setIsSplash] = useState(() => {
-    if (initialHashState) return initialHashState.isSplash;
-    const saved = localStorage.getItem("read_rabbit_is_splash");
-    return saved === "false" ? false : true;
+    if (initialHashState && initialHashState.isSplash === false && window.location.hash.includes("course=")) {
+      return false;
+    }
+    return true;
   });
 
   // Core Courses State with Local Storage persistence
@@ -432,13 +433,12 @@ export default function App() {
     };
   }, []);
 
-  // Persist State Changes to Server and Local Storage
+  // Persist State Changes to LocalStorage snapshot for offline backup
   useEffect(() => {
-    if (!isInitialServerFetchDone.current) {
+    if (!isInitialServerFetchDone.current || !courses || courses.length === 0) {
       return;
     }
-
-    saveCurriculumToServer(courses);
+    localStorage.setItem(CURRICULUM_STORAGE_KEY, JSON.stringify(courses));
   }, [courses]);
 
   // Helper to construct URL Hash string
@@ -724,6 +724,7 @@ export default function App() {
       })
     }));
     setCourses(updatedCourses);
+    saveCurriculumToServer(updatedCourses);
     handleSendNotification(
       "All Semesters Unlocked! 🔓",
       "Every single semester and learning unit is now fully open for research and exam preparation in the Burrow.",
@@ -1049,11 +1050,11 @@ export default function App() {
               onClick={() => fetchCurriculumFromServer(true)}
               disabled={isSyncingServer}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fff2e1] hover:bg-[#f8e6cb] text-[#95491a] border border-[#dac1c1]/40 rounded-xl transition-all text-xs font-bold cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
-              title={`Synced with Cloud Database${lastSyncSuccessTime ? ` at ${lastSyncSuccessTime}` : ""}. Click to re-sync.`}
+              title="Sync with Cloud Database"
             >
               <RefreshCw size={13} className={`text-[#95491a] ${isSyncingServer ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">
-                {isSyncingServer ? "Syncing..." : lastSyncSuccessTime ? `Synced (${lastSyncSuccessTime})` : "Sync Cloud"}
+                {isSyncingServer ? "Syncing..." : "Sync Cloud"}
               </span>
             </button>
 

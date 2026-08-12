@@ -152,22 +152,78 @@ export async function uploadFileToCloud(
 }
 
 let firestoreQuotaExceededUntil = 0;
+let lastSavedCoursesPayload = "";
+
+/**
+ * Validates connection to Firestore on initial boot.
+ */
+async function testFirestoreConnection() {
+  try {
+    const { getDocFromServer } = await import("firebase/firestore");
+    await getDocFromServer(doc(db, "courses", "main"));
+    logDiagnostic("success", "[Firestore Boot] Verified active connection to Firestore cloud!");
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("the client is offline")) {
+      console.warn("[Firestore Boot] Client is offline or Firestore config needs verification.");
+    }
+  }
+}
+testFirestoreConnection();
+
+/**
+ * Error handler helper for Firestore operations.
+ */
+export enum FirestoreOperationType {
+  CREATE = "create",
+  UPDATE = "update",
+  DELETE = "delete",
+  LIST = "list",
+  GET = "get",
+  WRITE = "write",
+}
+
+export function handleFirestoreError(error: unknown, operationType: FirestoreOperationType, path: string | null) {
+  const errMsg = error instanceof Error ? error.message : String(error);
+  const errInfo = {
+    error: errMsg,
+    operationType,
+    path,
+    timestamp: new Date().toISOString()
+  };
+  console.warn(`[Firestore Error Handler] ${operationType.toUpperCase()} at ${path}:`, errMsg);
+  logDiagnostic("warn", `[Firestore ${operationType.toUpperCase()} Error] ${path}: ${errMsg}`);
+}
 
 /**
  * Saves the entire curriculum and materials tree to Firebase Firestore.
  */
 export async function saveCoursesToFirestore(coursesData: any[]): Promise<boolean> {
-  logDiagnostic("info", `Writing curriculum payload (${coursesData.length} courses) to Firestore 'courses/main'...`);
+  if (!coursesData || !Array.isArray(coursesData) || coursesData.length === 0) {
+    return false;
+  }
+
+  // Cool off if quota exceeded or write stream exhausted
+  if (Date.now() < firestoreQuotaExceededUntil) {
+    logDiagnostic("info", "[Firestore Cloud] Write skipped (Quota or rate backoff active - saved locally & server disk)");
+    return false;
+  }
+
   try {
     const courseDocRef = doc(db, "courses", "main");
-    // Preserve full courses data structure including custom cards, subjects, units, and materials
     const payload = {
       coursesData: coursesData,
       updatedAt: new Date().toISOString()
     };
 
+    const payloadString = JSON.stringify(coursesData);
+    if (payloadString === lastSavedCoursesPayload) {
+      // Data hasn't changed, skip duplicate write
+      return true;
+    }
+
     await setDoc(courseDocRef, payload);
 
+    lastSavedCoursesPayload = payloadString;
     firestoreQuotaExceededUntil = 0; // Reset on success
     if (typeof window !== "undefined") window.sessionStorage?.removeItem("firestore_quota_exceeded");
 
@@ -181,22 +237,29 @@ export async function saveCoursesToFirestore(coursesData: any[]): Promise<boolea
     return true;
   } catch (err: any) {
     const errMsg = err?.message || String(err);
-    const isQuotaError = errMsg.includes("resource-exhausted") || errMsg.includes("Quota limit exceeded") || err?.code === "resource-exhausted";
-    
-    if (isQuotaError) {
-      firestoreQuotaExceededUntil = Date.now() + 86400000; // Cool down Firestore write calls for 24 hours
+    handleFirestoreError(err, FirestoreOperationType.WRITE, "courses/main");
+
+    const isQuotaOrStreamError =
+      errMsg.includes("resource-exhausted") ||
+      errMsg.includes("Quota limit exceeded") ||
+      errMsg.includes("backoff delay") ||
+      errMsg.includes("exhausted maximum allowed queued writes") ||
+      err?.code === "resource-exhausted";
+
+    if (isQuotaOrStreamError) {
+      // Pause writing to Firestore for 2 minutes to let queue clear & prevent stream exhaustion
+      firestoreQuotaExceededUntil = Date.now() + 120000;
       if (typeof window !== "undefined") {
         try { window.sessionStorage?.setItem("firestore_quota_exceeded", "true"); } catch (e) {}
       }
-      console.warn("[Firestore Quota Exceeded] Daily free tier write quota reached. App is seamlessly falling back to Supabase, Express server & localStorage.");
+      console.warn("[Firestore Quota/Stream Protection] Paused Firestore writes. Application is seamlessly falling back to Supabase, Express server & LocalStorage.");
     }
 
     updateDiagnostics({
       writeStatus: "FAILED",
-      writeError: isQuotaError ? "Firestore Daily Write Quota Exceeded (Saved to Supabase, Express Server & Local Storage instead)" : errMsg,
+      writeError: isQuotaOrStreamError ? "Firestore Write Cooldown Active (Fallback to Supabase, Express Server & Local Storage)" : errMsg,
       isFallbackActive: true
     });
-    logDiagnostic("warn", `[Firestore Write Notice] ${errMsg}`);
     return false;
   }
 }
