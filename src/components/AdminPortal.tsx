@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Course, Subject, Semester, Unit, StudyMaterial } from "../types";
+import { Course, Subject, Semester, Unit, StudyMaterial, AppNotification } from "../types";
 import { uploadFileToSupabaseStorage, deleteFileFromSupabaseStorage, insertMaterialToSupabaseDB, deleteMaterialFromSupabase, supabase } from "../lib/supabase";
 import { 
   ShieldCheck, 
@@ -32,7 +32,12 @@ import {
   Search,
   Filter,
   Eye,
-  HardDrive
+  EyeOff,
+  HardDrive,
+  Key,
+  Users,
+  Send,
+  Zap
 } from "lucide-react";
 
 interface AdminPortalProps {
@@ -41,7 +46,10 @@ interface AdminPortalProps {
   isAdmin: boolean;
   setIsAdmin: (isAdmin: boolean) => void;
   onClose?: () => void;
-  onSendNotification?: (title: string, message: string, tag?: string) => void;
+  onSendNotification?: (title: string, message: string, tag?: string, targetAudience?: string) => void;
+  notifications?: AppNotification[];
+  onDeleteNotification?: (id: string) => void;
+  onClearAllNotifications?: () => void;
 }
 
 export default function AdminPortal({
@@ -51,10 +59,14 @@ export default function AdminPortal({
   setIsAdmin,
   onClose,
   onSendNotification,
+  notifications = [],
+  onDeleteNotification,
+  onClearAllNotifications,
 }: AdminPortalProps) {
   // Login fields
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
@@ -322,11 +334,15 @@ export default function AdminPortal({
   const [notifTitle, setNotifTitle] = useState("");
   const [notifMessage, setNotifMessage] = useState("");
   const [notifTag, setNotifTag] = useState("Exam Alert");
+  const [notifAudience, setNotifAudience] = useState("All Enrolled Students & Faculty");
 
   // Security change password fields
   const [oldPasswordInput, setOldPasswordInput] = useState("");
   const [newPasswordInput, setNewPasswordInput] = useState("");
   const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [securitySuccess, setSecuritySuccess] = useState("");
   const [securityError, setSecurityError] = useState("");
 
@@ -342,15 +358,6 @@ export default function AdminPortal({
       clean === "admin" ||
       clean.includes("admin")
     );
-  };
-
-  // Reset password to default 'admin'
-  const handleResetToDefaultPassword = () => {
-    localStorage.setItem("read_rabbit_admin_password", "admin");
-    setAdminPassword("admin");
-    setPassword("admin");
-    setEmail("thecodeorbitoffi@gmail.com");
-    setLoginError("✅ Password reset to default: 'admin'. Click 'Log In' to enter! 🥕");
   };
 
   // Handle Dual-Authentication (Local Admin Passcode + Supabase Auth)
@@ -369,11 +376,7 @@ export default function AdminPortal({
 
     // 1. Check against local admin password stored in localStorage (default: "admin")
     const activeAdminPassword = localStorage.getItem("read_rabbit_admin_password") || "admin";
-    if (
-      inputPassword === activeAdminPassword ||
-      inputPassword === "admin" ||
-      inputPassword === "admin123"
-    ) {
+    if (inputPassword === activeAdminPassword) {
       localStorage.setItem("read_rabbit_is_admin", "true");
       setIsAdmin(true);
       setLoginError("");
@@ -402,7 +405,7 @@ export default function AdminPortal({
     }
 
     setIsAuthLoading(false);
-    setLoginError("Incorrect password. The default admin password is 'admin'. If you forgot your custom password, click 'Reset Password to admin' below.");
+    setLoginError("Incorrect password. Access restricted to authorized administrators only.");
   };
 
   // Handle Logout from Admin Portal
@@ -894,19 +897,21 @@ export default function AdminPortal({
     if (!notifTitle.trim() || !notifMessage.trim()) return;
 
     if (onSendNotification) {
-      onSendNotification(notifTitle.trim(), notifMessage.trim(), notifTag);
+      onSendNotification(notifTitle.trim(), notifMessage.trim(), notifTag, notifAudience);
       setNotifTitle("");
       setNotifMessage("");
-      alert("Academic notification dispatched and published successfully! 🥕");
+      alert("📢 Notification broadcasted to all students successfully! 🥕");
     } else {
       alert("Error: Notification service not integrated.");
     }
   };
 
-  // Change Password
+  // Change Password Handler (Inside Authenticated Admin Portal)
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
-    if (oldPasswordInput !== adminPassword) {
+    const currentPass = localStorage.getItem("read_rabbit_admin_password") || "admin";
+    
+    if (oldPasswordInput !== currentPass) {
       setSecurityError("Current administrator password is incorrect.");
       setSecuritySuccess("");
       return;
@@ -922,8 +927,9 @@ export default function AdminPortal({
       return;
     }
 
-    localStorage.setItem("read_rabbit_admin_password", newPasswordInput);
-    setAdminPassword(newPasswordInput);
+    const updatedPass = newPasswordInput.trim();
+    localStorage.setItem("read_rabbit_admin_password", updatedPass);
+    setAdminPassword(updatedPass);
     setOldPasswordInput("");
     setNewPasswordInput("");
     setConfirmPasswordInput("");
@@ -965,29 +971,30 @@ export default function AdminPortal({
               <label className="text-xs font-bold text-[#544243] flex items-center gap-1.5">
                 <Lock size={14} className="text-[#95491a]" /> ACCESS PASSWORD
               </label>
-              <input
-                type="password"
-                required
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#fff8f3]/60 border border-[#dac1c1] focus:border-[#fd9b65] focus:ring-1 focus:ring-[#fd9b65] rounded-xl px-4 py-3 text-sm focus:outline-none font-bold text-[#40010d]"
-              />
+              <div className="relative">
+                <input
+                  type={showLoginPassword ? "text" : "password"}
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-[#fff8f3]/60 border border-[#dac1c1] focus:border-[#fd9b65] focus:ring-1 focus:ring-[#fd9b65] rounded-xl pl-4 pr-11 py-3 text-sm focus:outline-none font-bold text-[#40010d]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#95491a] hover:text-[#7a2c35] p-1 transition-colors cursor-pointer"
+                  title={showLoginPassword ? "Hide password" : "Show password"}
+                >
+                  {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             {loginError && (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-[#95491a] bg-[#fff2e1] border border-[#dac1c1]/50 p-3 rounded-xl flex items-center gap-1.5">
-                  <Info size={14} className="shrink-0 text-[#95491a]" /> {loginError}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleResetToDefaultPassword}
-                  className="text-xs text-[#95491a] hover:underline font-bold transition-all cursor-pointer block text-left"
-                >
-                  🔑 Click here to reset Admin Password to default ("admin")
-                </button>
-              </div>
+              <p className="text-xs font-semibold text-[#95491a] bg-[#fff2e1] border border-[#dac1c1]/50 p-3 rounded-xl flex items-center gap-1.5">
+                <Info size={14} className="shrink-0 text-[#95491a]" /> {loginError}
+              </p>
             )}
 
             <div className="flex gap-3 pt-2">
@@ -2024,62 +2031,234 @@ export default function AdminPortal({
 
           {/* DISPATCH NOTIFICATIONS TAB VIEW */}
           {activeAdminTab === "notifications" && (
-            <div className="bg-white p-6 rounded-3xl border border-[#dac1c1]/20 shadow-xs max-w-xl mx-auto space-y-6">
-              <div className="space-y-1">
-                <h3 className="text-lg font-extrabold text-[#40010d] flex items-center gap-2">
-                  <Bell size={20} className="text-[#95491a]" /> Dispatch Academic Notifications
-                </h3>
-                <p className="text-xs text-[#544243]">
-                  Publish real-time global notifications that display to students with a live unread alert badge.
-                </p>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* DISPATCH FORM & PRESETS */}
+              <div className="lg:col-span-7 bg-white p-6 rounded-3xl border border-[#dac1c1]/20 shadow-xs space-y-6">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-extrabold text-[#40010d] flex items-center gap-2">
+                    <Bell size={20} className="text-[#95491a]" /> Broadcast Notification Dispatcher
+                  </h3>
+                  <p className="text-xs text-[#544243]">
+                    Publish instant notifications to all active student devices and save them permanently to cloud storage.
+                  </p>
+                </div>
+
+                {/* Quick Announcement Presets */}
+                <div className="space-y-2 bg-[#fff8f3] p-4 rounded-2xl border border-[#dac1c1]/40">
+                  <span className="text-[10px] font-extrabold text-[#95491a] uppercase tracking-wider flex items-center gap-1">
+                    <Zap size={12} /> Quick Fill Announcement Presets
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotifTag("Exam Alert");
+                        setNotifTitle("Midterm Practical & Theory Exam Dates Certified");
+                        setNotifMessage("The official examination schedule and hall tickets matrix have been released. Check your respective Subject Hubs for syllabus review.");
+                      }}
+                      className="text-[11px] font-bold bg-white text-[#40010d] border border-[#dac1c1] px-3 py-1.5 rounded-xl hover:bg-[#95491a] hover:text-white transition-all cursor-pointer shadow-2xs"
+                    >
+                      ⚠️ Exam Schedule
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotifTag("Curriculum");
+                        setNotifTitle("New Senior Study Notes & Question Banks Uploaded");
+                        setNotifMessage("Peer-reviewed notes, lab manuals, and solved 5-year question papers are now live under Syllabus Units.");
+                      }}
+                      className="text-[11px] font-bold bg-white text-[#40010d] border border-[#dac1c1] px-3 py-1.5 rounded-xl hover:bg-[#95491a] hover:text-white transition-all cursor-pointer shadow-2xs"
+                    >
+                      🥕 Notes Uploaded
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotifTag("Alumni Prep");
+                        setNotifTitle("Alumni Guidance & Campus Placement Seminar");
+                        setNotifMessage("Exclusive interaction session on Technical Coding & Data Structures roadmap scheduled for this Saturday.");
+                      }}
+                      className="text-[11px] font-bold bg-white text-[#40010d] border border-[#dac1c1] px-3 py-1.5 rounded-xl hover:bg-[#95491a] hover:text-white transition-all cursor-pointer shadow-2xs"
+                    >
+                      🎓 Alumni Seminar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotifTag("General");
+                        setNotifTitle("Urgent Practical Assignment Submission Extension");
+                        setNotifMessage("The laboratory submission portal deadline has been extended to Friday 11:59 PM. Please verify your files.");
+                      }}
+                      className="text-[11px] font-bold bg-white text-[#40010d] border border-[#dac1c1] px-3 py-1.5 rounded-xl hover:bg-[#95491a] hover:text-white transition-all cursor-pointer shadow-2xs"
+                    >
+                      🚨 Deadline Extension
+                    </button>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSendNotificationSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-[#544243] uppercase">Alert Level / Tag</label>
+                      <select
+                        value={notifTag}
+                        onChange={(e) => setNotifTag(e.target.value)}
+                        className="w-full bg-[#fff8f3]/60 border border-[#dac1c1] rounded-xl p-3 text-xs focus:outline-none font-bold text-[#40010d]"
+                      >
+                        <option value="Exam Alert">⚠️ Exam Alert</option>
+                        <option value="Curriculum">🥕 Curriculum Update</option>
+                        <option value="Alumni Prep">🎓 Alumni Prep Notes</option>
+                        <option value="General">📢 General Notice</option>
+                        <option value="Urgent Alert">🚨 Urgent Alert</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-[#544243] uppercase">Target Audience</label>
+                      <select
+                        value={notifAudience}
+                        onChange={(e) => setNotifAudience(e.target.value)}
+                        className="w-full bg-[#fff8f3]/60 border border-[#dac1c1] rounded-xl p-3 text-xs focus:outline-none font-bold text-[#40010d]"
+                      >
+                        <option value="All Enrolled Students & Faculty">👥 All Enrolled Students & Faculty</option>
+                        <option value="BCA General Students">💻 BCA General</option>
+                        <option value="BCA AI/ML Specialization">🤖 BCA AI/ML Specialization</option>
+                        <option value="BCA Data Science Specialization">📊 BCA Data Science</option>
+                        <option value="Semester 1 Students">🌱 Semester 1 Students</option>
+                        <option value="Semester 2 Students">🌿 Semester 2 Students</option>
+                        <option value="Semester 3 Students">🍂 Semester 3 Students</option>
+                        <option value="Semester 4 Students">🌾 Semester 4 Students</option>
+                        <option value="Semester 5 Students">🌲 Semester 5 Students</option>
+                        <option value="Semester 6 Students">🌳 Semester 6 Students</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-[#544243] uppercase">Notification Headline Title</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Midterm Practical Exam Dates Certified"
+                      value={notifTitle}
+                      onChange={(e) => setNotifTitle(e.target.value)}
+                      className="w-full bg-[#fff8f3]/60 border border-[#dac1c1] focus:border-[#fd9b65] rounded-xl p-3 text-xs focus:outline-none font-bold text-[#40010d]"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-[#544243] uppercase">Announcement Body Message</label>
+                    <textarea
+                      required
+                      placeholder="Write detailed announcements for students here..."
+                      value={notifMessage}
+                      onChange={(e) => setNotifMessage(e.target.value)}
+                      rows={4}
+                      className="w-full bg-[#fff8f3]/60 border border-[#dac1c1] focus:border-[#fd9b65] rounded-xl p-3 text-xs focus:outline-none font-medium text-[#231a0a]"
+                    />
+                  </div>
+
+                  {/* Live Student View Card Preview */}
+                  {(notifTitle || notifMessage) && (
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[10px] font-extrabold text-[#95491a] uppercase block">Live Student Device Preview:</span>
+                      <div className="p-3.5 bg-[#fff8f3] border-l-4 border-[#95491a] rounded-r-2xl shadow-2xs space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[9px] font-extrabold bg-[#95491a] text-white px-2 py-0.5 rounded-full">
+                            {notifTag}
+                          </span>
+                          <span className="text-[9px] font-extrabold text-gray-500 bg-white border border-gray-200 px-2 py-0.5 rounded-full">
+                            {notifAudience}
+                          </span>
+                        </div>
+                        <h4 className="font-extrabold text-xs text-[#40010d]">{notifTitle || "Notification Headline"}</h4>
+                        <p className="text-[11px] text-[#544243] line-clamp-2">{notifMessage || "Announcement message content preview..."}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full bg-[#40010d] text-white py-3.5 rounded-xl font-bold text-xs hover:bg-[#7a2c35] active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+                  >
+                    <Send size={15} /> Broadcast Notification to All Students
+                  </button>
+                </form>
               </div>
 
-              <form onSubmit={handleSendNotificationSubmit} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-[#544243]">NOTIFICATION ALERT LEVEL / TAG</label>
-                  <select
-                    value={notifTag}
-                    onChange={(e) => setNotifTag(e.target.value)}
-                    className="w-full bg-[#fff8f3]/60 border border-[#dac1c1] rounded-xl p-3 text-xs focus:outline-none font-bold"
-                  >
-                    <option value="Exam Alert">⚠️ Exam Alert</option>
-                    <option value="Curriculum">🥕 Curriculum Update</option>
-                    <option value="Alumni Prep">🎓 Alumni Prep Notes</option>
-                    <option value="General">📢 General Notice</option>
-                  </select>
+              {/* PUBLISHED NOTIFICATIONS HISTORY */}
+              <div className="lg:col-span-5 bg-white p-6 rounded-3xl border border-[#dac1c1]/20 shadow-xs space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-[#40010d] flex items-center gap-1.5">
+                      <Bell size={16} className="text-[#95491a]" /> Active Broadcast History
+                    </h3>
+                    <p className="text-[11px] text-[#544243]">
+                      {notifications.length} notification{notifications.length === 1 ? "" : "s"} live on student feeds
+                    </p>
+                  </div>
+
+                  {notifications.length > 0 && onClearAllNotifications && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm("Are you sure you want to clear all published notifications?")) {
+                          onClearAllNotifications();
+                        }
+                      }}
+                      className="text-[10px] font-extrabold text-red-600 hover:text-red-800 hover:underline cursor-pointer transition-all"
+                    >
+                      Clear All Broadcasts
+                    </button>
+                  )}
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-[#544243]">NOTIFICATION HEADLINE TITLE</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Midterm Lab Practical Exam Dates Certified"
-                    value={notifTitle}
-                    onChange={(e) => setNotifTitle(e.target.value)}
-                    className="w-full bg-[#fff8f3]/60 border border-[#dac1c1] focus:border-[#fd9b65] rounded-xl p-3 text-xs focus:outline-none font-bold"
-                  />
-                </div>
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-gray-200 space-y-2">
+                    <Bell size={28} className="mx-auto text-gray-300" />
+                    <p className="text-xs font-bold text-gray-400">No active broadcast notifications published yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                    {notifications.map((n) => (
+                      <div key={n.id} className="p-3.5 bg-[#fff8f3]/80 rounded-2xl border border-[#dac1c1]/40 space-y-1.5 relative group">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[9px] font-extrabold bg-[#95491a] text-white px-2 py-0.5 rounded-full">
+                              {n.tag || "Notice"}
+                            </span>
+                            {n.targetAudience && (
+                              <span className="text-[8px] font-bold text-gray-600 bg-white border border-gray-200 px-1.5 py-0.5 rounded-full">
+                                {n.targetAudience}
+                              </span>
+                            )}
+                          </div>
+                          {onDeleteNotification && (
+                            <button
+                              type="button"
+                              onClick={() => onDeleteNotification(n.id)}
+                              className="text-gray-400 hover:text-red-600 p-1 rounded-md transition-colors cursor-pointer"
+                              title="Delete notification"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-[#544243]">ANNOUNCEMENT BODY MESSAGE</label>
-                  <textarea
-                    required
-                    placeholder="Write detailed announcements for students here..."
-                    value={notifMessage}
-                    onChange={(e) => setNotifMessage(e.target.value)}
-                    rows={4}
-                    className="w-full bg-[#fff8f3]/60 border border-[#dac1c1] focus:border-[#fd9b65] rounded-xl p-3 text-xs focus:outline-none font-medium"
-                  />
-                </div>
+                        <h4 className="font-extrabold text-xs text-[#40010d] pr-6">{n.title}</h4>
+                        <p className="text-[11px] text-[#544243] leading-relaxed whitespace-pre-wrap">{n.message}</p>
 
-                <button
-                  type="submit"
-                  className="w-full bg-[#40010d] text-white py-3.5 rounded-xl font-bold text-xs hover:bg-[#7a2c35] active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs"
-                >
-                  <Bell size={16} /> Broadcast Notification Alert
-                </button>
-              </form>
+                        <div className="pt-1 text-[9px] font-bold text-gray-400 flex items-center justify-between">
+                          <span>⏱️ {n.timestamp}</span>
+                          <span className="text-emerald-700 font-extrabold flex items-center gap-1">
+                            <CheckCircle size={10} /> Active Broadcast
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -2110,38 +2289,68 @@ export default function AdminPortal({
               <form onSubmit={handleChangePassword} className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-[#544243] uppercase">Current Password</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={oldPasswordInput}
-                    onChange={(e) => setOldPasswordInput(e.target.value)}
-                    className="w-full bg-slate-50 border border-gray-200 focus:border-[#fd9b65] rounded-xl p-3 text-xs focus:outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showOldPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••••"
+                      value={oldPasswordInput}
+                      onChange={(e) => setOldPasswordInput(e.target.value)}
+                      className="w-full bg-slate-50 border border-gray-200 focus:border-[#fd9b65] rounded-xl pl-3 pr-10 py-3 text-xs focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowOldPassword(!showOldPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#95491a] p-1 transition-colors cursor-pointer"
+                      title={showOldPassword ? "Hide password" : "Show password"}
+                    >
+                      {showOldPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-[#544243] uppercase">New Password</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={newPasswordInput}
-                    onChange={(e) => setNewPasswordInput(e.target.value)}
-                    className="w-full bg-slate-50 border border-gray-200 focus:border-[#fd9b65] rounded-xl p-3 text-xs focus:outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••••"
+                      value={newPasswordInput}
+                      onChange={(e) => setNewPasswordInput(e.target.value)}
+                      className="w-full bg-slate-50 border border-gray-200 focus:border-[#fd9b65] rounded-xl pl-3 pr-10 py-3 text-xs focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#95491a] p-1 transition-colors cursor-pointer"
+                      title={showNewPassword ? "Hide password" : "Show password"}
+                    >
+                      {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-[#544243] uppercase">Confirm New Password</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={confirmPasswordInput}
-                    onChange={(e) => setConfirmPasswordInput(e.target.value)}
-                    className="w-full bg-slate-50 border border-gray-200 focus:border-[#fd9b65] rounded-xl p-3 text-xs focus:outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••••"
+                      value={confirmPasswordInput}
+                      onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                      className="w-full bg-slate-50 border border-gray-200 focus:border-[#fd9b65] rounded-xl pl-3 pr-10 py-3 text-xs focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#95491a] p-1 transition-colors cursor-pointer"
+                      title={showConfirmPassword ? "Hide password" : "Show password"}
+                    >
+                      {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
                 </div>
 
                 {securityError && (

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { initialCourses, ensureAllLanguageCardsExist } from "./data";
-import { Course, Subject, Semester, Unit, StudyMaterial } from "./types";
+import { Course, Subject, Semester, Unit, StudyMaterial, AppNotification } from "./types";
 
 // Import Components
 import Sidebar from "./components/Sidebar";
@@ -147,15 +147,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Persistent dynamic notifications state
-  interface AppNotification {
-    id: string;
-    title: string;
-    message: string;
-    timestamp: string;
-    isRead: boolean;
-    tag: string;
-  }
-
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
     const saved = localStorage.getItem("read_rabbit_notifications_v1");
     if (saved) {
@@ -236,26 +227,42 @@ export default function App() {
   }, [notifications]);
 
   // Add Notification callback (dispatches to local state, Express server & Firestore cloud)
-  const handleSendNotification = (title: string, message: string, tag?: string) => {
+  const handleSendNotification = (title: string, message: string, tag?: string, targetAudience?: string) => {
     const newNotif: AppNotification = {
       id: "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
       title,
       message,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + " " + new Date().toLocaleDateString([], { month: "short", day: "numeric" }),
       isRead: false,
-      tag: tag || "General"
+      tag: tag || "General",
+      targetAudience: targetAudience || "All Enrolled Students & Faculty"
     };
 
     setNotifications(prev => {
       const updated = [newNotif, ...prev];
-      // Sync to Express Server
+      // Sync full list to Express Server
       fetch("/api/notifications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newNotif)
+        body: JSON.stringify(updated)
       }).catch(err => console.warn("[Server Notif Sync Fail]", err));
 
       // Sync to Firestore Cloud
+      saveNotificationsToFirestore(updated);
+      return updated;
+    });
+  };
+
+  // Delete a single notification
+  const handleDeleteNotification = (notifId: string) => {
+    setNotifications(prev => {
+      const updated = prev.filter(n => n.id !== notifId);
+      fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      }).catch(err => console.warn("[Server Notif Delete Fail]", err));
+
       saveNotificationsToFirestore(updated);
       return updated;
     });
@@ -269,6 +276,12 @@ export default function App() {
   // Clear all notifications
   const handleClearAllNotifs = () => {
     setNotifications([]);
+    fetch("/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([])
+    }).catch(err => console.warn("[Server Notif Clear Fail]", err));
+    saveNotificationsToFirestore([]);
   };
 
   // Secret admin backdoor trigger
@@ -1002,11 +1015,16 @@ export default function App() {
                               {!n.isRead && (
                                 <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-rose-500 rounded-full" />
                               )}
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-[8px] bg-[#95491a]/10 text-[#95491a] px-1.5 py-0.5 rounded-full font-extrabold uppercase">
                                   {n.tag}
                                 </span>
-                                <span className="text-[9px] text-gray-400 font-medium">{n.timestamp}</span>
+                                {n.targetAudience && (
+                                  <span className="text-[8px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full font-bold">
+                                    {n.targetAudience}
+                                  </span>
+                                )}
+                                <span className="text-[9px] text-gray-400 font-medium ml-auto">{n.timestamp}</span>
                               </div>
                               <h4 className="font-sans font-bold text-xs text-[#40010d]">{n.title}</h4>
                               <p className="font-sans text-[11px] text-[#544243] leading-relaxed">{n.message}</p>
@@ -1255,6 +1273,9 @@ export default function App() {
               isAdmin={isAdmin}
               setIsAdmin={setIsAdmin}
               onSendNotification={handleSendNotification}
+              notifications={notifications}
+              onDeleteNotification={handleDeleteNotification}
+              onClearAllNotifications={handleClearAllNotifs}
               onClose={() => {
                 setActiveTab("semesters");
                 setSelectedSemesterId(null);

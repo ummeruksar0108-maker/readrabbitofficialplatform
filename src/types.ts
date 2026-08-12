@@ -1,3 +1,13 @@
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  isRead: boolean;
+  tag: string;
+  targetAudience?: string;
+}
+
 export interface ImportantQuestion {
   id: string;
   question: string;
