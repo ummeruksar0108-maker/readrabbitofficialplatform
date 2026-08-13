@@ -377,6 +377,25 @@ export default function AdminPortal({
     // 1. Check against local admin password stored in localStorage (default: "admin")
     const activeAdminPassword = localStorage.getItem("read_rabbit_admin_password") || "admin";
     if (inputPassword === activeAdminPassword) {
+      // Establish Supabase Auth session for protected Supabase uploads
+      try {
+        const targetEmail = trimmedEmail || (import.meta.env.VITE_ADMIN_EMAIL as string) || "admin@readrabbit.com";
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: targetEmail,
+          password: inputPassword,
+        });
+
+        if (signInErr) {
+          // Fallback to sign up if account does not exist yet in Supabase Auth
+          await supabase.auth.signUp({
+            email: targetEmail,
+            password: inputPassword,
+          }).catch((signUpErr) => console.warn("[SUPABASE AUTH SIGNUP NOTICE]", signUpErr?.message));
+        }
+      } catch (authErr: any) {
+        console.warn("[SUPABASE AUTH SESSION CREATION EXCEPTION]", authErr);
+      }
+
       localStorage.setItem("read_rabbit_is_admin", "true");
       setIsAdmin(true);
       setLoginError("");
