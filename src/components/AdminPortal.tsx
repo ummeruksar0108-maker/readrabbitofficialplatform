@@ -360,71 +360,48 @@ export default function AdminPortal({
     );
   };
 
-  // Handle Dual-Authentication (Local Admin Passcode + Supabase Auth)
+  // Handle Supabase Auth Login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedEmail = email.trim().toLowerCase();
     const inputPassword = password.trim();
 
+    if (!trimmedEmail) {
+      setLoginError("Please enter your registered administrator email address.");
+      return;
+    }
+
     if (!inputPassword) {
-      setLoginError("Please enter your admin access password.");
+      setLoginError("Please enter your Supabase account password.");
       return;
     }
 
     setIsAuthLoading(true);
     setLoginError("");
 
-    // 1. Check against local admin password stored in localStorage (default: "admin")
-    const activeAdminPassword = localStorage.getItem("read_rabbit_admin_password") || "admin";
-    if (inputPassword === activeAdminPassword) {
-      // Establish Supabase Auth session for protected Supabase uploads
-      try {
-        const targetEmail = trimmedEmail || (import.meta.env.VITE_ADMIN_EMAIL as string) || "admin@readrabbit.com";
-        const { error: signInErr } = await supabase.auth.signInWithPassword({
-          email: targetEmail,
-          password: inputPassword,
-        });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password: inputPassword,
+      });
 
-        if (signInErr) {
-          // Fallback to sign up if account does not exist yet in Supabase Auth
-          await supabase.auth.signUp({
-            email: targetEmail,
-            password: inputPassword,
-          }).catch((signUpErr) => console.warn("[SUPABASE AUTH SIGNUP NOTICE]", signUpErr?.message));
-        }
-      } catch (authErr: any) {
-        console.warn("[SUPABASE AUTH SESSION CREATION EXCEPTION]", authErr);
+      if (error || !data?.session) {
+        console.error("[SUPABASE AUTH LOGIN ERROR]", error);
+        setLoginError(error?.message || "Invalid email or password. Please check your Supabase Auth credentials.");
+        setIsAuthLoading(false);
+        return;
       }
 
+      // Successfully authenticated with Supabase Auth session
       localStorage.setItem("read_rabbit_is_admin", "true");
       setIsAdmin(true);
       setLoginError("");
       setIsAuthLoading(false);
-      return;
-    }
-
-    // 2. Fallback: Check via Supabase Auth
-    try {
-      if (trimmedEmail) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: trimmedEmail,
-          password: inputPassword,
-        });
-
-        if (!error && data.session && data.user) {
-          localStorage.setItem("read_rabbit_is_admin", "true");
-          setIsAdmin(true);
-          setLoginError("");
-          setIsAuthLoading(false);
-          return;
-        }
-      }
     } catch (err: any) {
-      console.warn("[SUPABASE AUTH FALLBACK EXCEPTION]", err);
+      console.error("[SUPABASE AUTH LOGIN EXCEPTION]", err);
+      setLoginError(err?.message || "Authentication failed. Please check your network connection and credentials.");
+      setIsAuthLoading(false);
     }
-
-    setIsAuthLoading(false);
-    setLoginError("Incorrect password. Access restricted to authorized administrators only.");
   };
 
   // Handle Logout from Admin Portal
