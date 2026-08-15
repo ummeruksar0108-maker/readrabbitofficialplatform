@@ -404,6 +404,31 @@ export default function AdminPortal({
     }
   };
 
+  // Handle Sending Supabase Auth Password Reset Email
+  const handleResetPasswordEmail = async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
+      setLoginError("Please enter your registered administrator email address above first.");
+      return;
+    }
+    setIsAuthLoading(true);
+    setLoginError("");
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+        redirectTo: window.location.origin,
+      });
+      setIsAuthLoading(false);
+      if (error) {
+        setLoginError(error.message);
+      } else {
+        alert(`Password recovery link sent to ${trimmedEmail}! Check your email inbox and click the reset link.`);
+      }
+    } catch (err: any) {
+      setIsAuthLoading(false);
+      setLoginError(err?.message || "Failed to send password reset email.");
+    }
+  };
+
   // Handle Logout from Admin Portal
   const handleLogout = async () => {
     try {
@@ -983,6 +1008,15 @@ export default function AdminPortal({
                   title={showLoginPassword ? "Hide password" : "Show password"}
                 >
                   {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <div className="flex justify-end pt-0.5">
+                <button
+                  type="button"
+                  onClick={handleResetPasswordEmail}
+                  className="text-[11px] font-bold text-[#95491a] hover:text-[#40010d] hover:underline cursor-pointer transition-colors"
+                >
+                  Forgot Password? Send Recovery Email
                 </button>
               </div>
             </div>

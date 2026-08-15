@@ -13,6 +13,7 @@ import SubjectHub from "./components/SubjectHub";
 import ExtraTabs from "./components/ExtraTabs";
 import AdminPortal from "./components/AdminPortal";
 import AddSubjectModal from "./components/AddSubjectModal";
+import PasswordResetModal from "./components/PasswordResetModal";
 import FirebaseDiagnosticsPanel from "./components/FirebaseDiagnosticsPanel";
 import { Logo } from "./components/Logo";
 import { logDiagnostic, saveCoursesToFirestore, loadCoursesFromFirestore, subscribeCoursesFromFirestore, saveNotificationsToFirestore, subscribeNotificationsFromFirestore } from "./lib/firebase";
@@ -136,6 +137,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(() => {
     return localStorage.getItem("read_rabbit_is_admin") === "true";
   });
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   // Modal control states
   const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
 
@@ -516,8 +518,16 @@ export default function App() {
     return clean === adminEmail || clean === "thecodeorbitoffi@gmail.com" || clean === "admin@readrabbit.com" || clean === "admin";
   };
 
-  // Sync Supabase Auth session with isAdmin state
+  // Sync Supabase Auth session with isAdmin state & handle Password Recovery
   useEffect(() => {
+    // Detect password recovery redirect from Supabase email link
+    if (
+      window.location.hash.includes("type=recovery") ||
+      window.location.search.includes("type=recovery")
+    ) {
+      setIsPasswordRecovery(true);
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       const userEmail = session?.user?.email;
       if (session?.user && isApprovedAdminEmail(userEmail)) {
@@ -526,7 +536,10 @@ export default function App() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setIsPasswordRecovery(true);
+      }
       const userEmail = session?.user?.email;
       if (session?.user && isApprovedAdminEmail(userEmail)) {
         localStorage.setItem("read_rabbit_is_admin", "true");
@@ -1313,6 +1326,22 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Password Reset Recovery Modal */}
+      <AnimatePresence>
+        {isPasswordRecovery && (
+          <PasswordResetModal
+            onComplete={() => {
+              setIsPasswordRecovery(false);
+              if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, "", window.location.pathname);
+              }
+              setIsSplash(false);
+              setActiveTab("admin");
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Custom Subject creation modal inside Semester subjects view */}
       <AnimatePresence>
