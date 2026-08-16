@@ -37,7 +37,7 @@ export default function Sidebar({
 
   const navItems = [
     { id: "semesters", label: "My Semesters", icon: Layers },
-    { id: "library", label: "The Library", icon: BookOpen },
+    { id: "library", label: "PYQ Library", icon: BookOpen },
     ...(isAdmin ? [{ id: "admin", label: "Admin Portal", icon: ShieldCheck, badge: "Active" }] : []),
     { id: "settings", label: "Settings", icon: Settings },
   ];

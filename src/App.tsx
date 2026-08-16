@@ -11,6 +11,7 @@ import CurriculumRoadmap from "./components/CurriculumRoadmap";
 import CuratedSubjects from "./components/CuratedSubjects";
 import SubjectHub from "./components/SubjectHub";
 import ExtraTabs from "./components/ExtraTabs";
+import QuestionPaperLibrary from "./components/QuestionPaperLibrary";
 import AdminPortal from "./components/AdminPortal";
 import AddSubjectModal from "./components/AddSubjectModal";
 import PasswordResetModal from "./components/PasswordResetModal";
@@ -1128,7 +1129,7 @@ export default function App() {
                   <nav className="space-y-1">
                     {[
                       { id: "semesters", label: "My Semesters", icon: Layers },
-                      { id: "library", label: "The Library", icon: BookOpen },
+                      { id: "library", label: "PYQ Library", icon: BookOpen },
                       ...(isAdmin ? [{ id: "admin", label: "Admin Portal", icon: ShieldCheck, badge: "Active" }] : []),
                       { id: "settings", label: "Settings", icon: Settings },
                     ].map((item) => {
@@ -1262,8 +1263,25 @@ export default function App() {
             />
           )}
 
-          {/* THE LIBRARY & GENERAL SETTINGS PANEL */}
-          {["library", "settings"].includes(activeTab) && (
+          {/* THE PREVIOUS YEAR QUESTION PAPERS LIBRARY */}
+          {activeTab === "library" && (
+            <QuestionPaperLibrary
+              courses={courses}
+              activeCourseId={selectedCourseId}
+              isAdmin={isAdmin}
+              onUpdateCourses={handleUpdateCourses}
+              onNavigateToSubject={(courseId, semId, subId) => {
+                setSelectedCourseId(courseId);
+                setSelectedSemesterId(semId);
+                setSelectedSubjectId(subId);
+                setActiveTab("units");
+                pushAppHistory(courseId, semId, subId, "units");
+              }}
+            />
+          )}
+
+          {/* GENERAL SETTINGS PANEL */}
+          {activeTab === "settings" && (
             <ExtraTabs
               activeTab={activeTab}
               onNavigateToSyllabus={() => {

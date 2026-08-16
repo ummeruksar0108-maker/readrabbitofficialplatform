@@ -24,6 +24,7 @@ import {
   User,
   ShieldCheck,
   RefreshCw,
+  AlertCircle,
   Plus,
   Trash2,
   Upload,
@@ -612,6 +613,8 @@ export default function SubjectHub({
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [isRetryingUpload, setIsRetryingUpload] = useState(false);
+  const [retryToastMsg, setRetryToastMsg] = useState("");
   const [adminNoteTitle, setAdminNoteTitle] = useState("");
   const [adminNoteContent, setAdminNoteContent] = useState("");
   const [adminNoteType, setAdminNoteType] = useState<"pdf" | "code" | "question">("pdf");
@@ -884,6 +887,8 @@ export default function SubjectHub({
 
     setUploadError("");
     setUploadSuccess("");
+    setIsRetryingUpload(false);
+    setRetryToastMsg("");
     if (!file) {
       console.error("[UPLOAD ERROR] No file provided to handleProcessFile");
       return;
@@ -895,7 +900,7 @@ export default function SubjectHub({
 
     let cloudRes: UploadResult | null = null;
     try {
-      // 1. Upload to Supabase Storage
+      // 1. Upload to Supabase Storage with automatic retry tracking
       cloudRes = await uploadFileToSupabaseStorage(
         file,
         {
@@ -905,9 +910,17 @@ export default function SubjectHub({
           unitId: targetUnitId || "subject_general"
         },
         (pct, statusMsg) => {
+          if (statusMsg.toLowerCase().includes("retrying")) {
+            setIsRetryingUpload(true);
+            setRetryToastMsg(statusMsg);
+          } else if (pct > 30) {
+            setIsRetryingUpload(false);
+          }
           setUploadSuccess(`⏳ ${pct}% - ${statusMsg}`);
         }
       );
+      setIsRetryingUpload(false);
+      setRetryToastMsg("");
       console.log("[STORAGE UPLOAD SUCCESS] Public URL:", cloudRes.publicUrl);
 
       const logCoordinates = `courseId: "${cloudRes.courseId}", semesterId: "${cloudRes.semesterId}", subjectId: "${cloudRes.subjectId}", unitId: "${cloudRes.unitId}", materialName: "${cloudRes.name}"`;
@@ -1001,6 +1014,7 @@ export default function SubjectHub({
       setUploadSuccess("");
     } finally {
       setIsUploadingFile(false);
+      setIsRetryingUpload(false);
     }
   };
 
@@ -3971,6 +3985,36 @@ export default function SubjectHub({
           </div>
         )}
 
+      </AnimatePresence>
+
+      {/* Floating Retrying Upload / Progress Toast Notification */}
+      <AnimatePresence>
+        {(isRetryingUpload || (isUploadingFile && retryToastMsg)) && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-50 max-w-md bg-[#40010d] text-white p-4 rounded-2xl shadow-2xl border border-[#fd9b65]/50 flex items-start gap-3.5 backdrop-blur-md"
+          >
+            <div className="p-2 bg-[#fd9b65]/20 text-[#fd9b65] rounded-xl shrink-0 animate-spin">
+              <RefreshCw size={20} />
+            </div>
+            <div className="space-y-1 flex-1 pr-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-[#fd9b65]">
+                  Retrying Upload...
+                </span>
+                <span className="inline-block w-2 h-2 rounded-full bg-[#fd9b65] animate-ping" />
+              </div>
+              <p className="text-xs text-white/90 leading-relaxed font-medium">
+                {retryToastMsg || "Network glitch detected. Automatically retrying Supabase file upload with exponential backoff..."}
+              </p>
+              <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden mt-2">
+                <div className="bg-gradient-to-r from-[#fd9b65] to-amber-300 h-full rounded-full animate-pulse w-3/4" />
+              </div>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
     </div>

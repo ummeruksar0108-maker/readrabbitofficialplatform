@@ -293,23 +293,46 @@ export async function uploadFileToSupabaseStorage(
   logDiagnostic("info", `[Supabase Storage] Uploading "${file.name}" (${formattedSize}) to bucket 'study-materials' at '${cloudPath}'...`);
   if (onProgress) onProgress(25, `Uploading "${file.name}" to Supabase Storage...`);
 
-  const { error } = await supabase.storage
-    .from('study-materials')
-    .upload(cloudPath, file, {
-      cacheControl: '3600',
-      upsert: true
-    });
+  // Retry loop with exponential backoff for network/protocol recovery
+  const MAX_RETRIES = 3;
+  let uploadError: any = null;
 
-  if (error) {
-    logDiagnostic("error", `[Supabase Upload Failed] ${error.message}`);
-    const msg = error.message.toLowerCase();
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const { error } = await supabase.storage
+      .from('study-materials')
+      .upload(cloudPath, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (!error) {
+      uploadError = null;
+      break;
+    }
+
+    uploadError = error;
+    if (attempt < MAX_RETRIES) {
+      const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+      const retryMsg = `Network glitch: Retrying upload (attempt ${attempt + 1}/${MAX_RETRIES}) in ${(delayMs / 1000).toFixed(1)}s...`;
+      logDiagnostic("warn", `[Supabase Storage Retry] Upload attempt ${attempt} failed (${error.message}). Retrying in ${(delayMs / 1000).toFixed(1)}s...`);
+      console.warn(`[SUPABASE UPLOAD RETRY] Attempt ${attempt} failed. Backing off ${delayMs}ms:`, error);
+      if (onProgress) {
+        onProgress(30, retryMsg);
+      }
+      await new Promise((res) => setTimeout(res, delayMs));
+    }
+  }
+
+  if (uploadError) {
+    logDiagnostic("error", `[Supabase Upload Failed] ${uploadError.message}`);
+    const msg = uploadError.message.toLowerCase();
     if (msg.includes("bucket not found")) {
       throw new Error("Supabase Storage bucket 'study-materials' does not exist! Go to Supabase Dashboard -> Storage -> Create a public bucket named 'study-materials'.");
     }
     if (msg.includes("row-level security") || msg.includes("policy") || msg.includes("unauthorized") || msg.includes("permission denied")) {
       throw new Error("Supabase RLS policy issue: Make sure bucket 'study-materials' is set to Public or has INSERT/SELECT policies enabled for anon users.");
     }
-    throw new Error(`Supabase Storage Upload Failed: ${error.message}`);
+    throw new Error(`Supabase Storage Upload Failed: ${uploadError.message}`);
   }
 
   if (onProgress) onProgress(75, `Storage upload complete! Generating URL...`);

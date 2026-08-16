@@ -111,25 +111,8 @@ export default function CurriculumRoadmap({ courses, activeCourseId, onSelectSem
                         {semester.description}
                       </p>
 
-                      {/* Progress Bar / Prerequisites */}
-                      {!isLocked ? (
-                        <div className="space-y-3">
-                          <div className="w-full bg-[#F4ECE1] h-2 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-1000 ${
-                                isMastered ? "bg-[#10B981]" : "bg-[#D97706]"
-                              }`}
-                              style={{ width: `${semester.progressPercent}%` }}
-                            ></div>
-                          </div>
-                          <div className="flex justify-between items-center text-[11px] font-sans text-[#735E55] font-semibold">
-                            <span>{semester.completedModules} Modules Completed</span>
-                            <span className={isMastered ? "text-[#10B981] font-bold" : "text-[#D97706] font-bold"}>
-                              {semester.progressPercent}%
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
+                      {/* Prerequisites if locked */}
+                      {isLocked && (
                         <div className="mt-auto">
                           <button
                             onClick={(e) => {
