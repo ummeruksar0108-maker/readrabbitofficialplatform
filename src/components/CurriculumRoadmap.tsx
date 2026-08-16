@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { motion } from "motion/react";
 import { Course, Semester } from "../types";
 import { BookOpen, Edit3, Lock, ChevronRight, HelpCircle, ShieldCheck } from "lucide-react";
@@ -12,6 +13,10 @@ interface CurriculumRoadmapProps {
 }
 
 export default function CurriculumRoadmap({ courses, activeCourseId, onSelectSemester, onShowPrereqs, onUnlockAll, onOpenAdminPortal }: CurriculumRoadmapProps) {
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [activeCourseId]);
+
   // Check if there are any locked semesters across the active course
   const hasLockedSemesters = courses
     .filter(c => c.id === activeCourseId)

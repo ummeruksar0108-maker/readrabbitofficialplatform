@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Subject } from "../types";
 import * as LucideIcons from "lucide-react";
@@ -26,6 +26,10 @@ export default function CuratedSubjects({
   semesterName = "Semester",
 }: CuratedSubjectsProps) {
   const [viewingPracticalLabs, setViewingPracticalLabs] = useState(false);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [viewingPracticalLabs, semesterName]);
 
   const isLabSubject = (subject: Subject) => {
     return (

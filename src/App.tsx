@@ -509,6 +509,12 @@ export default function App() {
         targetHash || window.location.pathname + window.location.search
       );
     }
+
+    // Always ensure pages start cleanly scrolled to top when navigating
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    if (document.documentElement) {
+      document.documentElement.scrollTop = 0;
+    }
   }, [selectedCourseId, selectedSemesterId, selectedSubjectId, isSplash, activeTab]);
 
   // Helper to verify single configured admin email

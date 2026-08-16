@@ -145,14 +145,14 @@ export default function SubjectHub({
     );
   }, [subject]);
 
-  // Language II expandable options state
+  // Language II expandable options state (starts collapsed by default)
   const [expandedLangId, setExpandedLangId] = useState<string>("");
 
+  // Reset accordion state and scroll to top when opening a subject
   useEffect(() => {
-    if (isLang2Subject) {
-      setExpandedLangId(subject.units[0]?.id || `${subject.id}_kan`);
-    }
-  }, [subject.id, isLang2Subject, subject.units]);
+    setExpandedLangId("");
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [subject.id]);
 
   // Recursive updater for top-level and nested units
   function updateUnitsList(units: Unit[], targetId: string, updateFn: (u: Unit) => Unit): Unit[] {

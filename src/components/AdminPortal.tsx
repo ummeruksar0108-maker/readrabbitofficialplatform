@@ -83,6 +83,7 @@ export default function AdminPortal({
 
   // Fetch server disk files when Uploads tab is opened
   React.useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     if (activeAdminTab === "uploads") {
       setIsLoadingServerFiles(true);
       fetch("/api/uploads")

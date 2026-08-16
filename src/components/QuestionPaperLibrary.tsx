@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Course, Semester, Subject, StudyMaterial } from "../types";
 import { 
   FileText, 
@@ -73,6 +73,10 @@ export default function QuestionPaperLibrary({
   // Search query & year filter
   const [searchQuery, setSearchQuery] = useState("");
   const [yearFilter, setYearFilter] = useState<string>("all");
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [selectedCourseId, selectedSemesterId]);
 
   // Upload Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
