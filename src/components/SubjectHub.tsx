@@ -935,9 +935,8 @@ export default function SubjectHub({
         console.log(`[SUPABASE DB INSERT SUCCESS] Record for "${cloudRes.name}" successfully inserted into study_materials table.`);
         logDiagnostic("success", `[SUPABASE DB INSERT SUCCESS] Record for "${cloudRes.name}" successfully inserted into study_materials table.`);
       } catch (dbErr: any) {
-        console.error(`[SUPABASE DB INSERT FAILED] Failed to insert metadata for "${cloudRes.name}" into study_materials:`, dbErr);
-        logDiagnostic("error", `[SUPABASE DB INSERT FAILED] Failed to insert metadata into study_materials: ${dbErr?.message || dbErr}`);
-        throw dbErr;
+        console.warn(`[SUPABASE DB INSERT NON-BLOCKING] Metadata insert skipped:`, dbErr?.message || dbErr);
+        logDiagnostic("warn", `[SUPABASE DB INSERT NON-BLOCKING] Storage upload succeeded, database metadata skipped.`);
       }
 
       const newMaterial: StudyMaterial = {
