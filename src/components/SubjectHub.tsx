@@ -115,23 +115,221 @@ export default function SubjectHub({
     setActiveYtVideo(null);
   };
 
+  // Determine subject classification
+  const isLabSubject = useMemo(() => {
+    return (
+      subject.isLab ||
+      subject.contentMode === "labs" ||
+      subject.name.toLowerCase().includes("lab") ||
+      subject.id.includes("lab")
+    );
+  }, [subject]);
+
+  const isLang1Subject = useMemo(() => {
+    return (
+      subject.contentMode === "chapters" ||
+      subject.name.toLowerCase().includes("language i") ||
+      subject.name.toLowerCase() === "language 1" ||
+      subject.id.startsWith("language_1") ||
+      subject.id.includes("lang1")
+    );
+  }, [subject]);
+
+  const isLang2Subject = useMemo(() => {
+    return (
+      subject.contentMode === "languages" ||
+      subject.name.toLowerCase().includes("language ii") ||
+      subject.name.toLowerCase() === "language 2" ||
+      subject.id.startsWith("language_2") ||
+      subject.id.includes("lang2")
+    );
+  }, [subject]);
+
+  // Language II expandable options state
+  const [expandedLangId, setExpandedLangId] = useState<string>("");
+
+  useEffect(() => {
+    if (isLang2Subject) {
+      setExpandedLangId(subject.units[0]?.id || `${subject.id}_kan`);
+    }
+  }, [subject.id, isLang2Subject, subject.units]);
+
+  // Recursive updater for top-level and nested units
+  function updateUnitsList(units: Unit[], targetId: string, updateFn: (u: Unit) => Unit): Unit[] {
+    return units.map(unit => {
+      if (unit.id === targetId) {
+        return updateFn(unit);
+      }
+      if (unit.children && unit.children.length > 0) {
+        return {
+          ...unit,
+          children: updateUnitsList(unit.children, targetId, updateFn)
+        };
+      }
+      return unit;
+    });
+  }
+
+  // Recursive deleter for top-level and nested units
+  function deleteFromUnitsList(units: Unit[], targetId: string): Unit[] {
+    return units
+      .filter(u => u.id !== targetId)
+      .map(u => ({
+        ...u,
+        children: u.children ? deleteFromUnitsList(u.children, targetId) : undefined
+      }));
+  }
+
+  // Display Units computation for Labs, Language I, and standard theory subjects
+  const displayUnits = useMemo(() => {
+    if (isLabSubject) {
+      if (subject.units && subject.units.length > 0) {
+        return subject.units;
+      }
+      const requiredLabSections = [
+        { name: "Manual", desc: "Comprehensive Laboratory Manual, experiment procedures, and theoretical instructions." },
+        { name: "Outputs", desc: "Sample code outputs, practical execution screenshots, and terminal results." },
+        { name: "Viva Questions", desc: "Essential viva voce questions, practical exam interview Q&A, and lab quizzes." }
+      ];
+
+      return requiredLabSections.map((sec, idx) => ({
+        id: `${subject.id}_lab_${idx + 1}`,
+        number: `0${idx + 1}`,
+        name: sec.name,
+        description: `${subject.name} - ${sec.desc}`,
+        masteryPercent: 0,
+        status: "In Progress" as const,
+        materials: [],
+        importantQuestions: [],
+        youtubeLinks: []
+      }));
+    }
+
+    if (isLang1Subject) {
+      // Filter out textbook unit (which is displayed separately in the Prescribed Reference section)
+      const nonTextbookUnits = (subject.units || []).filter(
+        u => u.kind !== "textbook" && !u.name.toLowerCase().includes("textbook")
+      );
+
+      // If units exist in subject.units, return ALL of them, preserving custom titles and newly added cards!
+      if (nonTextbookUnits.length > 0) {
+        return nonTextbookUnits;
+      }
+
+      // Default fallback if subject.units is empty
+      const chapterNames = ["Chapter 1", "Chapter 2", "Chapter 3", "Chapter 4"];
+      return chapterNames.map((chName, idx) => ({
+        id: `${subject.id}_ch_${idx + 1}`,
+        number: `0${idx + 1}`,
+        name: chName,
+        description: `${subject.name} - ${chName} Study Material & Notes`,
+        masteryPercent: 0,
+        status: "In Progress" as const,
+        materials: [],
+        importantQuestions: [],
+        youtubeLinks: []
+      }));
+    }
+
+    return (subject.units || []).filter(u => !u.name.toLowerCase().includes("textbook") && u.kind !== "textbook");
+  }, [subject, isLabSubject, isLang1Subject]);
+
+  // Language II Options computation: Kannada, Hindi, Additional English
+  const lang2Options = useMemo(() => {
+    if (!isLang2Subject) return [];
+
+    const defaultLangs = [
+      { id: `${subject.id}_kan`, name: "Kannada", code: "kan" },
+      { id: `${subject.id}_hin`, name: "Hindi", code: "hin" },
+      { id: `${subject.id}_ae`, name: "Additional English", code: "ae" }
+    ];
+
+    return defaultLangs.map((lang, idx) => {
+      const existingLangUnit = subject.units.find(u => 
+        u.name.toLowerCase().includes(lang.name.toLowerCase()) || 
+        u.id.includes(lang.code) ||
+        u.id === `${subject.id}_${lang.code}` ||
+        u.id === `lang2_s1_${lang.code}`
+      );
+
+      const defaultChildren: Unit[] = [
+        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Textbook`, masteryPercent: 0, status: "In Progress", materials: subject.textbooks || [] },
+        { id: `${subject.id}_${lang.code}_ch1`, number: "01", name: "Chapter 1", description: `${lang.name} Chapter 1 Study Material`, masteryPercent: 0, status: "In Progress" },
+        { id: `${subject.id}_${lang.code}_ch2`, number: "02", name: "Chapter 2", description: `${lang.name} Chapter 2 Study Material`, masteryPercent: 0, status: "In Progress" },
+        { id: `${subject.id}_${lang.code}_ch3`, number: "03", name: "Chapter 3", description: `${lang.name} Chapter 3 Study Material`, masteryPercent: 0, status: "In Progress" },
+        { id: `${subject.id}_${lang.code}_ch4`, number: "04", name: "Chapter 4", description: `${lang.name} Chapter 4 Study Material`, masteryPercent: 0, status: "In Progress" }
+      ];
+
+      const rawChildren = existingLangUnit?.children && existingLangUnit.children.length > 0
+        ? existingLangUnit.children
+        : defaultChildren;
+
+      const hasTb = rawChildren.some(c => c.name.toLowerCase().includes("textbook") || c.kind === "textbook");
+      const children = hasTb ? rawChildren : [
+        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Textbook`, masteryPercent: 0, status: "In Progress" },
+        ...rawChildren
+      ];
+
+      return {
+        id: existingLangUnit?.id || `${subject.id}_${lang.code}`,
+        name: existingLangUnit?.name || lang.name,
+        number: existingLangUnit?.number || `0${idx + 1}`,
+        description: existingLangUnit?.description || `${lang.name} language curriculum & coursework`,
+        status: existingLangUnit?.status || "In Progress",
+        children
+      };
+    });
+  }, [subject, isLang2Subject]);
+
+  // Master resolver for current effective units
+  const getEffectiveUnits = (): Unit[] => {
+    if (isLang2Subject) {
+      return lang2Options.map(l => ({
+        id: l.id,
+        name: l.name,
+        number: l.number,
+        description: l.description,
+        status: l.status,
+        masteryPercent: 0,
+        materials: [],
+        children: l.children
+      }));
+    }
+    if (subject.units && subject.units.length > 0) {
+      return subject.units;
+    }
+    return displayUnits;
+  };
+
   // Unit Card Creator / Editor Modal State
   const [isAddUnitModalOpen, setIsAddUnitModalOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
+  const [targetParentUnitId, setTargetParentUnitId] = useState<string | null>(null);
+  const [targetParentUnitName, setTargetParentUnitName] = useState<string>("");
   const [newUnitNumber, setNewUnitNumber] = useState("");
   const [newUnitName, setNewUnitName] = useState("");
   const [newUnitDesc, setNewUnitDesc] = useState("");
   const [newUnitTopics, setNewUnitTopics] = useState("");
 
-  const handleOpenAddUnitModal = () => {
+  const handleOpenAddUnitModal = (parentUnitId?: string, parentUnitName?: string) => {
     if (!isAdmin) {
       alert("Only administrators can add unit cards.");
       return;
     }
     setEditingUnit(null);
-    const nextNum = (displayUnits.length + 1).toString().padStart(2, "0");
-    setNewUnitNumber(nextNum);
-    setNewUnitName(`Unit ${displayUnits.length + 1}: `);
+    setTargetParentUnitId(parentUnitId || null);
+    setTargetParentUnitName(parentUnitName || "");
+    
+    if (parentUnitId && isLang2Subject) {
+      const parentOption = lang2Options.find(l => l.id === parentUnitId);
+      const childCount = parentOption?.children ? parentOption.children.length : 0;
+      setNewUnitNumber(`0${childCount}`);
+      setNewUnitName(`Chapter ${childCount}: `);
+    } else {
+      const nextNum = (displayUnits.length + 1).toString().padStart(2, "0");
+      setNewUnitNumber(nextNum);
+      setNewUnitName(`Unit ${displayUnits.length + 1}: `);
+    }
     setNewUnitDesc("");
     setNewUnitTopics("");
     setIsAddUnitModalOpen(true);
@@ -143,6 +341,8 @@ export default function SubjectHub({
       return;
     }
     setEditingUnit(unitToEdit);
+    setTargetParentUnitId(null);
+    setTargetParentUnitName("");
     setNewUnitNumber(unitToEdit.number || "01");
     setNewUnitName(unitToEdit.name);
     setNewUnitDesc(unitToEdit.description || "");
@@ -165,28 +365,51 @@ export default function SubjectHub({
       .map(t => t.trim())
       .filter(Boolean);
 
+    const baseUnits = getEffectiveUnits();
     let updatedUnits: Unit[] = [];
-    const existingUnits = subject.units && subject.units.length > 0 ? [...subject.units] : [...displayUnits];
 
     if (editingUnit) {
-      // Edit existing unit
-      updatedUnits = existingUnits.map(u => {
-        if (u.id === editingUnit.id) {
-          return {
-            ...u,
-            number: newUnitNumber.trim() || u.number,
-            name: newUnitName.trim(),
-            description: newUnitDesc.trim() || u.description,
-            topics: topicsArray.length > 0 ? topicsArray : u.topics
-          };
-        }
-        return u;
-      });
+      // Edit existing unit anywhere in the hierarchy (top-level or nested child card)
+      let found = false;
+      const modifyUnitRecursively = (unitsList: Unit[]): Unit[] => {
+        return unitsList.map(u => {
+          if (u.id === editingUnit.id) {
+            found = true;
+            return {
+              ...u,
+              number: newUnitNumber.trim() || u.number,
+              name: newUnitName.trim(),
+              description: newUnitDesc.trim() || u.description,
+              topics: topicsArray.length > 0 ? topicsArray : u.topics
+            };
+          }
+          if (u.children && u.children.length > 0) {
+            return {
+              ...u,
+              children: modifyUnitRecursively(u.children)
+            };
+          }
+          return u;
+        });
+      };
+
+      updatedUnits = modifyUnitRecursively(baseUnits);
+
+      if (!found) {
+        // Fallback if not found in tree
+        updatedUnits = updateUnitsList(baseUnits, editingUnit.id, u => ({
+          ...u,
+          number: newUnitNumber.trim() || u.number,
+          name: newUnitName.trim(),
+          description: newUnitDesc.trim() || u.description,
+          topics: topicsArray.length > 0 ? topicsArray : u.topics
+        }));
+      }
     } else {
-      // Add new unit
+      // Add new unit / chapter card
       const newUnitCard: Unit = {
         id: `unit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        number: newUnitNumber.trim() || `0${displayUnits.length + 1}`,
+        number: newUnitNumber.trim() || "01",
         name: newUnitName.trim(),
         description: newUnitDesc.trim() || `Comprehensive syllabus materials for ${newUnitName.trim()}`,
         masteryPercent: 0,
@@ -196,19 +419,48 @@ export default function SubjectHub({
         importantQuestions: [],
         youtubeLinks: []
       };
-      updatedUnits = [...existingUnits, newUnitCard];
+
+      if (targetParentUnitId) {
+        // Add as a child inside the selected language option
+        updatedUnits = baseUnits.map(p => {
+          if (p.id === targetParentUnitId) {
+            return {
+              ...p,
+              children: [...(p.children || []), newUnitCard]
+            };
+          }
+          return p;
+        });
+      } else if (isLang2Subject && expandedLangId) {
+        // If in Language II, attach to currently opened language
+        updatedUnits = baseUnits.map(p => {
+          if (p.id === expandedLangId) {
+            return {
+              ...p,
+              children: [...(p.children || []), newUnitCard]
+            };
+          }
+          return p;
+        });
+      } else {
+        updatedUnits = [...baseUnits, newUnitCard];
+      }
     }
 
     const updatedSubject: Subject = {
       ...subject,
       units: updatedUnits,
-      modulesCount: updatedUnits.length
+      modulesCount: isLang2Subject 
+        ? updatedUnits.reduce((acc, u) => acc + (u.children?.length || 1), 0)
+        : updatedUnits.length
     };
 
     onUpdateSubject(updatedSubject);
     setIsAddUnitModalOpen(false);
     setEditingUnit(null);
-    alert(editingUnit ? `Unit "${newUnitName.trim()}" successfully updated! 🥕` : `New Unit Card "${newUnitName.trim()}" added and synchronized across devices! 🥕`);
+    setTargetParentUnitId(null);
+    setTargetParentUnitName("");
+    alert(editingUnit ? `Card "${newUnitName.trim()}" successfully updated! 🥕` : `New Card "${newUnitName.trim()}" added and synchronized across devices! 🥕`);
   };
 
   const handleDeleteUnitCard = (unitToDelete: Unit) => {
@@ -218,16 +470,44 @@ export default function SubjectHub({
     }
     if (!window.confirm(`Are you sure you want to delete "${unitToDelete.name}"? This action cannot be undone.`)) return;
 
-    const existingUnits = subject.units && subject.units.length > 0 ? [...subject.units] : [...displayUnits];
-    const updatedUnits = existingUnits.filter(u => u.id !== unitToDelete.id);
+    const baseUnits = getEffectiveUnits();
+    const updatedUnits = deleteFromUnitsList(baseUnits, unitToDelete.id);
 
     const updatedSubject: Subject = {
       ...subject,
       units: updatedUnits,
-      modulesCount: updatedUnits.length
+      modulesCount: isLang2Subject 
+        ? updatedUnits.reduce((acc, u) => acc + (u.children?.length || 1), 0)
+        : updatedUnits.length
     };
 
     onUpdateSubject(updatedSubject);
+  };
+
+  const handleToggleUnitStatus = (unitId: string) => {
+    const baseUnits = getEffectiveUnits();
+    const updatedUnits = updateUnitsList(baseUnits, unitId, unit => {
+      const nextStatus: "Locked" | "In Progress" | "Mastered" = 
+        unit.status === "Mastered" ? "In Progress" : unit.status === "In Progress" ? "Locked" : "Mastered";
+      const nextPercent = nextStatus === "Mastered" ? 100 : nextStatus === "In Progress" ? 50 : 0;
+      return { ...unit, status: nextStatus, masteryPercent: nextPercent };
+    });
+
+    const completed = updatedUnits.reduce((count, u) => {
+      if (u.children && u.children.length > 0) {
+        return count + u.children.filter(c => c.status === "Mastered").length;
+      }
+      return count + (u.status === "Mastered" ? 1 : 0);
+    }, 0);
+
+    const total = updatedUnits.reduce((count, u) => count + (u.children ? u.children.length : 1), 0);
+
+    onUpdateSubject({
+      ...subject,
+      units: updatedUnits,
+      completedModules: completed,
+      progressPercent: Math.round((completed / Math.max(1, total)) * 100)
+    });
   };
 
   // Material Blob Resolution State
@@ -658,8 +938,20 @@ export default function SubjectHub({
       return;
     }
     if (!window.confirm("Are you sure you want to delete this file/note from this unit?")) return;
-    const targetUnit = subject.units.find(u => u.id === unitId);
-    const targetMat = targetUnit?.materials?.find(m => m.id === materialId);
+    
+    const baseUnits = getEffectiveUnits();
+    let targetMat: StudyMaterial | undefined;
+    const findMatInTree = (units: Unit[]) => {
+      for (const u of units) {
+        const found = u.materials?.find(m => m.id === materialId);
+        if (found) {
+          targetMat = found;
+          return;
+        }
+        if (u.children) findMatInTree(u.children);
+      }
+    };
+    findMatInTree(baseUnits);
     
     const delRes = await deleteMaterialFromSupabase(materialId, targetMat?.cloudPath);
     if (!delRes.success) {
@@ -667,13 +959,11 @@ export default function SubjectHub({
       return;
     }
 
-    const updatedUnits = subject.units.map(unit => {
-      if (unit.id !== unitId) return unit;
-      return {
-        ...unit,
-        materials: (unit.materials || []).filter(m => m.id !== materialId)
-      };
-    });
+    const updatedUnits = updateUnitsList(baseUnits, unitId, unit => ({
+      ...unit,
+      materials: (unit.materials || []).filter(m => m.id !== materialId)
+    }));
+
     onUpdateSubject({
       ...subject,
       units: updatedUnits
@@ -734,26 +1024,22 @@ export default function SubjectHub({
       url: ytUrl.trim(),
       channelName: "Academic Lecture Video"
     };
-    const updatedUnits = subject.units.map(u => {
-      if (u.id !== unitId) return u;
-      return {
-        ...u,
-        youtubeLinks: [...(u.youtubeLinks || []), newYt]
-      };
-    });
+    const baseUnits = getEffectiveUnits();
+    const updatedUnits = updateUnitsList(baseUnits, unitId, u => ({
+      ...u,
+      youtubeLinks: [...(u.youtubeLinks || []), newYt]
+    }));
     onUpdateSubject({ ...subject, units: updatedUnits });
     setYtTitle("");
     setYtUrl("");
   };
 
   const handleDeleteYoutubeLink = (unitId: string, ytId: string) => {
-    const updatedUnits = subject.units.map(u => {
-      if (u.id !== unitId) return u;
-      return {
-        ...u,
-        youtubeLinks: (u.youtubeLinks || []).filter(y => y.id !== ytId)
-      };
-    });
+    const baseUnits = getEffectiveUnits();
+    const updatedUnits = updateUnitsList(baseUnits, unitId, u => ({
+      ...u,
+      youtubeLinks: (u.youtubeLinks || []).filter(y => y.id !== ytId)
+    }));
     onUpdateSubject({ ...subject, units: updatedUnits });
   };
 
@@ -770,26 +1056,22 @@ export default function SubjectHub({
       importance: qImportance,
       yearTag: "High Yield Exam Topic"
     };
-    const updatedUnits = subject.units.map(u => {
-      if (u.id !== unitId) return u;
-      return {
-        ...u,
-        importantQuestions: [...(u.importantQuestions || []), newQ]
-      };
-    });
+    const baseUnits = getEffectiveUnits();
+    const updatedUnits = updateUnitsList(baseUnits, unitId, u => ({
+      ...u,
+      importantQuestions: [...(u.importantQuestions || []), newQ]
+    }));
     onUpdateSubject({ ...subject, units: updatedUnits });
     setQText("");
     setQAnswer("");
   };
 
   const handleDeleteImportantQuestion = (unitId: string, qId: string) => {
-    const updatedUnits = subject.units.map(u => {
-      if (u.id !== unitId) return u;
-      return {
-        ...u,
-        importantQuestions: (u.importantQuestions || []).filter(q => q.id !== qId)
-      };
-    });
+    const baseUnits = getEffectiveUnits();
+    const updatedUnits = updateUnitsList(baseUnits, unitId, u => ({
+      ...u,
+      importantQuestions: (u.importantQuestions || []).filter(q => q.id !== qId)
+    }));
     onUpdateSubject({ ...subject, units: updatedUnits });
   };
 
@@ -966,15 +1248,14 @@ export default function SubjectHub({
           materials: [...(subject.materials || []), newMaterial]
         };
       } else if (targetUnitId) {
+        const baseUnits = getEffectiveUnits();
+        const updatedUnits = updateUnitsList(baseUnits, targetUnitId, unit => ({
+          ...unit,
+          materials: [...(unit.materials || []), newMaterial]
+        }));
         updatedSubjectObj = {
           ...subject,
-          units: subject.units.map(unit => {
-            if (unit.id !== targetUnitId) return unit;
-            return {
-              ...unit,
-              materials: [...(unit.materials || []), newMaterial]
-            };
-          })
+          units: updatedUnits
         };
       } else {
         updatedSubjectObj = {
@@ -1044,15 +1325,13 @@ export default function SubjectHub({
       details: adminNoteContent
     };
 
+    const baseUnits = getEffectiveUnits();
     const updatedSubjectObj: Subject = targetUnitId ? {
       ...subject,
-      units: subject.units.map(unit => {
-        if (unit.id !== targetUnitId) return unit;
-        return {
-          ...unit,
-          materials: [...(unit.materials || []), newMaterial]
-        };
-      })
+      units: updateUnitsList(baseUnits, targetUnitId, unit => ({
+        ...unit,
+        materials: [...(unit.materials || []), newMaterial]
+      }))
     } : {
       ...subject,
       materials: [...(subject.materials || []), newMaterial]
@@ -1131,177 +1410,6 @@ export default function SubjectHub({
       setCurrentQuestionIndex(0);
       setQuizScore(0);
     }
-  };
-
-  // Determine subject classification
-  const isLabSubject = useMemo(() => {
-    return (
-      subject.isLab ||
-      subject.contentMode === "labs" ||
-      subject.name.toLowerCase().includes("lab") ||
-      subject.id.includes("lab")
-    );
-  }, [subject]);
-
-  const isLang1Subject = useMemo(() => {
-    return (
-      subject.contentMode === "chapters" ||
-      subject.name.toLowerCase().includes("language i") ||
-      subject.name.toLowerCase() === "language 1" ||
-      subject.id.startsWith("language_1") ||
-      subject.id.includes("lang1")
-    );
-  }, [subject]);
-
-  const isLang2Subject = useMemo(() => {
-    return (
-      subject.contentMode === "languages" ||
-      subject.name.toLowerCase().includes("language ii") ||
-      subject.name.toLowerCase() === "language 2" ||
-      subject.id.startsWith("language_2") ||
-      subject.id.includes("lang2")
-    );
-  }, [subject]);
-
-  // Language II expandable options state
-  const [expandedLangId, setExpandedLangId] = useState<string>("");
-
-  useEffect(() => {
-    if (isLang2Subject) {
-      setExpandedLangId(subject.units[0]?.id || `${subject.id}_kan`);
-    }
-  }, [subject.id, isLang2Subject]);
-
-  // Recursive updater for top-level and nested units
-  function updateUnitsList(units: Unit[], targetId: string, updateFn: (u: Unit) => Unit): Unit[] {
-    return units.map(unit => {
-      if (unit.id === targetId) {
-        return updateFn(unit);
-      }
-      if (unit.children && unit.children.length > 0) {
-        return {
-          ...unit,
-          children: updateUnitsList(unit.children, targetId, updateFn)
-        };
-      }
-      return unit;
-    });
-  }
-
-  // Display Units computation for Labs, Language I, and standard theory subjects
-  const displayUnits = useMemo(() => {
-    if (isLabSubject) {
-      if (subject.units && subject.units.length > 0) {
-        return subject.units;
-      }
-      const requiredLabSections = [
-        { name: "Manual", desc: "Comprehensive Laboratory Manual, experiment procedures, and theoretical instructions." },
-        { name: "Outputs", desc: "Sample code outputs, practical execution screenshots, and terminal results." },
-        { name: "Viva Questions", desc: "Essential viva voce questions, practical exam interview Q&A, and lab quizzes." }
-      ];
-
-      return requiredLabSections.map((sec, idx) => ({
-        id: `${subject.id}_lab_${idx + 1}`,
-        number: `0${idx + 1}`,
-        name: sec.name,
-        description: `${subject.name} - ${sec.desc}`,
-        masteryPercent: 0,
-        status: "In Progress" as const,
-        materials: [],
-        importantQuestions: [],
-        youtubeLinks: []
-      }));
-    }
-
-    if (isLang1Subject) {
-      // Filter out textbook unit (which is displayed separately in the Prescribed Reference section)
-      const nonTextbookUnits = (subject.units || []).filter(
-        u => u.kind !== "textbook" && !u.name.toLowerCase().includes("textbook")
-      );
-
-      // If units exist in subject.units, return ALL of them, preserving custom titles and newly added cards!
-      if (nonTextbookUnits.length > 0) {
-        return nonTextbookUnits;
-      }
-
-      // Default fallback if subject.units is empty
-      const chapterNames = ["Chapter 1", "Chapter 2", "Chapter 3", "Chapter 4"];
-      return chapterNames.map((chName, idx) => ({
-        id: `${subject.id}_ch_${idx + 1}`,
-        number: `0${idx + 1}`,
-        name: chName,
-        description: `${subject.name} - ${chName} Study Material & Notes`,
-        masteryPercent: 0,
-        status: "In Progress" as const,
-        materials: [],
-        importantQuestions: [],
-        youtubeLinks: []
-      }));
-    }
-
-    return (subject.units || []).filter(u => !u.name.toLowerCase().includes("textbook") && u.kind !== "textbook");
-  }, [subject, isLabSubject, isLang1Subject]);
-
-  // Language II Options computation: Kannada, Hindi, Additional English
-  const lang2Options = useMemo(() => {
-    if (!isLang2Subject) return [];
-
-    const defaultLangs = [
-      { id: `${subject.id}_kan`, name: "Kannada", code: "kan" },
-      { id: `${subject.id}_hin`, name: "Hindi", code: "hin" },
-      { id: `${subject.id}_ae`, name: "Additional English", code: "ae" }
-    ];
-
-    return defaultLangs.map((lang, idx) => {
-      const existingLangUnit = subject.units.find(u => 
-        u.name.toLowerCase().includes(lang.name.toLowerCase()) || u.id.includes(lang.code)
-      );
-
-      const defaultChildren: Unit[] = [
-        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Textbook`, masteryPercent: 0, status: "In Progress", materials: subject.textbooks || [] },
-        { id: `${subject.id}_${lang.code}_ch1`, number: "01", name: "Chapter 1", description: `${lang.name} Chapter 1 Study Material`, masteryPercent: 0, status: "In Progress" },
-        { id: `${subject.id}_${lang.code}_ch2`, number: "02", name: "Chapter 2", description: `${lang.name} Chapter 2 Study Material`, masteryPercent: 0, status: "In Progress" },
-        { id: `${subject.id}_${lang.code}_ch3`, number: "03", name: "Chapter 3", description: `${lang.name} Chapter 3 Study Material`, masteryPercent: 0, status: "In Progress" },
-        { id: `${subject.id}_${lang.code}_ch4`, number: "04", name: "Chapter 4", description: `${lang.name} Chapter 4 Study Material`, masteryPercent: 0, status: "In Progress" }
-      ];
-
-      const rawChildren = existingLangUnit?.children && existingLangUnit.children.length > 0
-        ? existingLangUnit.children
-        : defaultChildren;
-
-      const hasTb = rawChildren.some(c => c.name.toLowerCase().includes("textbook"));
-      const children = hasTb ? rawChildren : [
-        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Textbook`, masteryPercent: 0, status: "In Progress" },
-        ...rawChildren
-      ];
-
-      return {
-        id: existingLangUnit?.id || `${subject.id}_${lang.code}`,
-        name: lang.name,
-        number: `0${idx + 1}`,
-        description: existingLangUnit?.description || `${lang.name} language curriculum & coursework`,
-        status: existingLangUnit?.status || "In Progress",
-        children
-      };
-    });
-  }, [subject, isLang2Subject]);
-
-  const handleToggleUnitStatus = (unitId: string) => {
-    const updatedUnits = updateUnitsList(subject.units, unitId, unit => {
-      const nextStatus: "Locked" | "In Progress" | "Mastered" = 
-        unit.status === "Mastered" ? "In Progress" : unit.status === "In Progress" ? "Locked" : "Mastered";
-      const nextPercent = nextStatus === "Mastered" ? 100 : nextStatus === "In Progress" ? 50 : 0;
-      return { ...unit, status: nextStatus, masteryPercent: nextPercent };
-    });
-
-    const completed = updatedUnits.filter(u => u.status === "Mastered").length;
-
-    onUpdateSubject({
-      ...subject,
-      units: updatedUnits,
-      completedModules: completed,
-      progressPercent: Math.round((completed / Math.max(1, updatedUnits.length)) * 100)
-    });
   };
 
   const renderUnitCard = (unit: Unit) => {
@@ -2438,15 +2546,31 @@ export default function SubjectHub({
                           </div>
                         </button>
 
-                        {/* Accordion Content: Textbook + Chapters 1-4 */}
+                        {/* Accordion Content: Textbook + Chapters */}
                         <AnimatePresence>
                           {isExpanded && (
                             <motion.div
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: "auto", opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
-                              className="border-t border-[#D8C4AC]/60 p-5 bg-[#FDFBF7]"
+                              className="border-t border-[#D8C4AC]/60 p-5 bg-[#FDFBF7] space-y-4"
                             >
+                              {isAdmin && (
+                                <div className="flex justify-between items-center bg-[#F3ECE5] p-3 rounded-2xl border border-[#D8C4AC]">
+                                  <span className="text-xs font-extrabold text-[#561C24]">
+                                    📚 {langOption.name} Course Sections ({langOption.children.length})
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenAddUnitModal(langOption.id, langOption.name)}
+                                    className="px-3.5 py-1.5 bg-[#561C24] hover:bg-[#3D141A] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                                  >
+                                    <Plus size={14} />
+                                    <span>Add Chapter to {langOption.name}</span>
+                                  </button>
+                                </div>
+                              )}
+
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {langOption.children.map((childUnit) => renderUnitCard(childUnit))}
                               </div>
@@ -3895,7 +4019,7 @@ export default function SubjectHub({
             >
               <div className="flex justify-between items-center border-b border-[#dac1c1]/30 pb-4 mb-5">
                 <h3 className="font-sans text-lg font-extrabold text-[#40010d] flex items-center gap-2">
-                  {editingUnit ? "Edit Unit Card" : "Add New Unit Card"} <Sparkles size={18} className="text-[#fd9b65]" />
+                  {editingUnit ? `Edit Card: ${editingUnit.name}` : `Add New ${isLang2Subject ? "Chapter Card" : "Unit Card"}`} <Sparkles size={18} className="text-[#fd9b65]" />
                 </h3>
                 <button
                   type="button"
