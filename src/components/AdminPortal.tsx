@@ -64,7 +64,7 @@ export default function AdminPortal({
   onClearAllNotifications,
 }: AdminPortalProps) {
   // Login fields
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => (import.meta.env.VITE_ADMIN_EMAIL as string) || "thecodeorbitoffi@gmail.com");
   const [password, setPassword] = useState("");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginError, setLoginError] = useState("");
@@ -386,8 +386,11 @@ export default function AdminPortal({
       });
 
       if (error || !data?.session) {
-        console.error("[SUPABASE AUTH LOGIN ERROR]", error);
-        setLoginError(error?.message || "Invalid email or password. Please check your Supabase Auth credentials.");
+        console.warn("[SUPABASE AUTH LOGIN NOTICE]", error?.message);
+        const errMsg = error?.message?.toLowerCase().includes("invalid login credentials")
+          ? "Invalid email or password. Please verify your credentials or click 'Forgot Password? Send Recovery Email' below to reset your password."
+          : error?.message || "Invalid email or password. Please check your Supabase Auth credentials.";
+        setLoginError(errMsg);
         setIsAuthLoading(false);
         return;
       }
