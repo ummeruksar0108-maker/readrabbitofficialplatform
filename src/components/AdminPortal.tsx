@@ -1395,6 +1395,120 @@ export default function AdminPortal({
                                 </div>
                               </div>
 
+                              {/* NESTED LANGUAGE CHAPTERS (IF ANY) */}
+                              {unit.children && unit.children.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-purple-100 bg-purple-50/50 p-3.5 rounded-xl space-y-3">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-extrabold text-purple-900 uppercase tracking-wide flex items-center gap-1.5">
+                                      📚 {unit.name} Chapters / Course Sections ({unit.children.length})
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const nextChNum = (unit.children!.length + 1).toString().padStart(2, "0");
+                                        const updated = [...formUnits];
+                                        updated[index] = {
+                                          ...unit,
+                                          children: [
+                                            ...unit.children!,
+                                            {
+                                              id: `ch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                                              number: nextChNum,
+                                              name: `Chapter ${unit.children!.length + 1}`,
+                                              description: `${unit.name} Chapter ${unit.children!.length + 1} Study Material`,
+                                              masteryPercent: 0,
+                                              status: "Locked",
+                                              kind: "chapter",
+                                              materials: []
+                                            }
+                                          ]
+                                        };
+                                        setFormUnits(updated);
+                                      }}
+                                      className="px-2.5 py-1 bg-purple-700 hover:bg-purple-800 text-white text-[9px] font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                                    >
+                                      <Plus size={11} /> Add Chapter
+                                    </button>
+                                  </div>
+
+                                  <div className="space-y-2.5">
+                                    {unit.children.map((ch, chIdx) => (
+                                      <div key={ch.id || chIdx} className="bg-white p-2.5 rounded-lg border border-purple-200/60 flex flex-wrap gap-2 items-center">
+                                        <div className="w-14 shrink-0">
+                                          <label className="text-[8px] font-bold text-gray-400 block">CH #</label>
+                                          <input
+                                            type="text"
+                                            value={ch.number}
+                                            onChange={(e) => {
+                                              const updated = [...formUnits];
+                                              const chList = [...unit.children!];
+                                              chList[chIdx] = { ...ch, number: e.target.value };
+                                              updated[index] = { ...unit, children: chList };
+                                              setFormUnits(updated);
+                                            }}
+                                            className="w-full bg-slate-50 border border-gray-200 rounded p-1 text-xs font-bold text-center"
+                                          />
+                                        </div>
+
+                                        <div className="flex-1 min-w-[150px]">
+                                          <label className="text-[8px] font-bold text-gray-400 block">CHAPTER NAME</label>
+                                          <input
+                                            type="text"
+                                            value={ch.name}
+                                            onChange={(e) => {
+                                              const updated = [...formUnits];
+                                              const chList = [...unit.children!];
+                                              chList[chIdx] = { ...ch, name: e.target.value };
+                                              updated[index] = { ...unit, children: chList };
+                                              setFormUnits(updated);
+                                            }}
+                                            placeholder="e.g. Chapter 1: Kavya"
+                                            className="w-full bg-slate-50 border border-gray-200 rounded p-1 text-xs font-semibold"
+                                          />
+                                        </div>
+
+                                        <div className="flex-1 min-w-[180px]">
+                                          <label className="text-[8px] font-bold text-gray-400 block">DESCRIPTION</label>
+                                          <input
+                                            type="text"
+                                            value={ch.description || ""}
+                                            onChange={(e) => {
+                                              const updated = [...formUnits];
+                                              const chList = [...unit.children!];
+                                              chList[chIdx] = { ...ch, description: e.target.value };
+                                              updated[index] = { ...unit, children: chList };
+                                              setFormUnits(updated);
+                                            }}
+                                            placeholder="Chapter synopsis..."
+                                            className="w-full bg-slate-50 border border-gray-200 rounded p-1 text-xs text-gray-600"
+                                          />
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (unit.children!.length <= 1) {
+                                              alert("Each language must have at least one chapter or card.");
+                                              return;
+                                            }
+                                            const updated = [...formUnits];
+                                            updated[index] = {
+                                              ...unit,
+                                              children: unit.children!.filter((_, i) => i !== chIdx)
+                                            };
+                                            setFormUnits(updated);
+                                          }}
+                                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors self-end mb-0.5"
+                                          title="Remove Chapter"
+                                        >
+                                          <Trash2 size={12} />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
                               {/* UNIT FILE PDF UPLOAD FORM (INSIDE UNITS) */}
                               <div className="mt-2 pt-2 border-t border-dashed border-gray-200">
                                 <button

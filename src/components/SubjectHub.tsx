@@ -382,14 +382,14 @@ export default function SubjectHub({
 
   const handleOpenEditUnitModal = (unitToEdit: Unit) => {
     if (!isAdmin) {
-      alert("Only administrators can edit unit cards.");
+      alert("Only administrators can edit unit cards. Unlock admin mode in the top navigation or settings.");
       return;
     }
     setEditingUnit(unitToEdit);
     setTargetParentUnitId(null);
     setTargetParentUnitName("");
     setNewUnitNumber(unitToEdit.number || "01");
-    setNewUnitName(unitToEdit.name);
+    setNewUnitName(unitToEdit.name || "");
     setNewUnitDesc(unitToEdit.description || "");
     setNewUnitTopics(unitToEdit.topics ? unitToEdit.topics.join(", ") : "");
     setIsAddUnitModalOpen(true);
@@ -401,7 +401,7 @@ export default function SubjectHub({
       return;
     }
     if (!newUnitName.trim()) {
-      alert("Please enter a Unit Name!");
+      alert("Please enter a card name!");
       return;
     }
 
@@ -414,11 +414,11 @@ export default function SubjectHub({
     let updatedUnits: Unit[] = [];
 
     if (editingUnit) {
-      // Edit existing unit anywhere in the hierarchy (top-level or nested child card)
+      // Edit existing unit anywhere in the hierarchy (top-level language or nested chapter card)
       let found = false;
       const modifyUnitRecursively = (unitsList: Unit[]): Unit[] => {
         return unitsList.map(u => {
-          if (u.id === editingUnit.id) {
+          if (u.id === editingUnit.id || (editingUnit.id && u.id.endsWith(editingUnit.id)) || (u.name === editingUnit.name && u.number === editingUnit.number)) {
             found = true;
             return {
               ...u,
@@ -441,7 +441,7 @@ export default function SubjectHub({
       updatedUnits = modifyUnitRecursively(baseUnits);
 
       if (!found) {
-        // Fallback if not found in tree
+        // Direct recursive fallback using updateUnitsList
         updatedUnits = updateUnitsList(baseUnits, editingUnit.id, u => ({
           ...u,
           number: newUnitNumber.trim() || u.number,
@@ -2569,13 +2569,13 @@ export default function SubjectHub({
                     return (
                       <div key={langOption.id} className="bg-white rounded-3xl border border-[#D8C4AC] overflow-hidden shadow-xs transition-all">
                         {/* Accordion Header for Language Option */}
-                        <button
-                          type="button"
-                          onClick={() => setExpandedLangId(isExpanded ? "" : langOption.id)}
-                          className="w-full p-5 flex items-center justify-between gap-4 text-left hover:bg-[#F8F4EF] transition-colors cursor-pointer"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-2xl bg-[#561C24] text-white flex items-center justify-center font-bold text-sm">
+                        <div className="w-full p-5 flex items-center justify-between gap-4 text-left hover:bg-[#F8F4EF] transition-colors">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedLangId(isExpanded ? "" : langOption.id)}
+                            className="flex items-center gap-3 flex-1 text-left cursor-pointer"
+                          >
+                            <div className="w-10 h-10 rounded-2xl bg-[#561C24] text-white flex items-center justify-center font-bold text-sm shrink-0">
                               {langOption.number}
                             </div>
                             <div>
@@ -2583,18 +2583,40 @@ export default function SubjectHub({
                                 {langOption.name}
                               </h3>
                               <p className="text-xs text-[#8B6B52]">
-                                Includes Textbook and Chapters 1 - 4
+                                {langOption.description || `Includes Textbook and Chapters (${langOption.children?.length || 0} items)`}
                               </p>
                             </div>
-                          </div>
+                          </button>
 
-                          <div className="flex items-center gap-3">
-                            <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#F3ECE5] text-[#561C24]">
+                          <div className="flex items-center gap-2.5">
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditUnitModal(langOption);
+                                }}
+                                className="p-2 text-gray-400 hover:text-[#95491a] hover:bg-[#f8e6cb] rounded-xl transition-colors cursor-pointer"
+                                title={`Edit ${langOption.name} Option Details`}
+                              >
+                                <Pencil size={15} />
+                              </button>
+                            )}
+                            <span 
+                              onClick={() => setExpandedLangId(isExpanded ? "" : langOption.id)}
+                              className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#F3ECE5] text-[#561C24] cursor-pointer"
+                            >
                               {langOption.children.length} Course Items
                             </span>
-                            <ChevronDown size={20} className={`text-[#A67C52] transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`} />
+                            <button
+                              type="button"
+                              onClick={() => setExpandedLangId(isExpanded ? "" : langOption.id)}
+                              className="p-1 text-[#A67C52] cursor-pointer"
+                            >
+                              <ChevronDown size={20} className={`transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`} />
+                            </button>
                           </div>
-                        </button>
+                        </div>
 
                         {/* Accordion Content: Textbook + Chapters */}
                         <AnimatePresence>
@@ -4069,7 +4091,9 @@ export default function SubjectHub({
             >
               <div className="flex justify-between items-center border-b border-[#dac1c1]/30 pb-4 mb-5">
                 <h3 className="font-sans text-lg font-extrabold text-[#40010d] flex items-center gap-2">
-                  {editingUnit ? `Edit Card: ${editingUnit.name}` : `Add New ${isLang2Subject ? "Chapter Card" : "Unit Card"}`} <Sparkles size={18} className="text-[#fd9b65]" />
+                  {editingUnit 
+                    ? `Edit ${isLang2Subject || editingUnit.kind === "chapter" ? "Chapter" : "Unit"}: ${editingUnit.name}` 
+                    : `Add New ${isLang2Subject || targetParentUnitId ? "Chapter Card" : "Unit Card"}`} <Sparkles size={18} className="text-[#fd9b65]" />
                 </h3>
                 <button
                   type="button"
@@ -4084,11 +4108,11 @@ export default function SubjectHub({
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-1">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-[#544243] mb-1.5">
-                      Unit Number
+                      {isLang2Subject || editingUnit?.kind === "chapter" ? "Chapter / Section #" : "Unit Number"}
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. 05"
+                      placeholder={isLang2Subject ? "01" : "05"}
                       value={newUnitNumber}
                       onChange={(e) => setNewUnitNumber(e.target.value)}
                       className="w-full bg-white border border-[#dac1c1] px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[#fd9b65]"
@@ -4098,11 +4122,11 @@ export default function SubjectHub({
 
                   <div className="col-span-2">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-[#544243] mb-1.5">
-                      Unit Name *
+                      {isLang2Subject || editingUnit?.kind === "chapter" ? "Chapter / Section Name *" : "Unit Name *"}
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Unit 5: Distributed Systems"
+                      placeholder={isLang2Subject ? "e.g. Chapter 1: Poetry & Prose" : "e.g. Unit 5: Distributed Systems"}
                       value={newUnitName}
                       onChange={(e) => setNewUnitName(e.target.value)}
                       className="w-full bg-white border border-[#dac1c1] px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[#fd9b65]"
@@ -4113,10 +4137,10 @@ export default function SubjectHub({
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-[#544243] mb-1.5">
-                    Unit Description
+                    {isLang2Subject || editingUnit?.kind === "chapter" ? "Chapter Description" : "Unit Description"}
                   </label>
                   <textarea
-                    placeholder="Brief overview of concepts covered in this unit..."
+                    placeholder={isLang2Subject ? "Summary of this chapter or language module..." : "Brief overview of concepts covered in this unit..."}
                     value={newUnitDesc}
                     onChange={(e) => setNewUnitDesc(e.target.value)}
                     rows={3}
@@ -4130,7 +4154,7 @@ export default function SubjectHub({
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Microservices, Consensus Algorithms, Fault Tolerance"
+                    placeholder={isLang2Subject ? "e.g. Grammar, Comprehension, Literary Elements" : "e.g. Microservices, Consensus Algorithms, Fault Tolerance"}
                     value={newUnitTopics}
                     onChange={(e) => setNewUnitTopics(e.target.value)}
                     className="w-full bg-white border border-[#dac1c1] px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[#fd9b65]"
@@ -4150,7 +4174,7 @@ export default function SubjectHub({
                     className="px-5 py-2.5 bg-[#95491a] hover:bg-[#7a2c35] text-white font-bold text-xs rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-1.5"
                   >
                     <Save size={14} />
-                    <span>{editingUnit ? "Save Changes" : "Create Unit Card"}</span>
+                    <span>{editingUnit ? "Save Changes" : isLang2Subject ? "Add Chapter Card" : "Create Unit Card"}</span>
                   </button>
                 </div>
               </form>
