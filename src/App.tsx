@@ -42,7 +42,11 @@ const hasAllDefaultCourses = (value: unknown): value is Course[] => {
 export default function App() {
   // Website Background Color State with Local Storage persistence
   const [bgColor, setBgColor] = useState<string>(() => {
-    return localStorage.getItem("read_rabbit_bg_color") || "#FAF3E0";
+    const saved = localStorage.getItem("read_rabbit_bg_color");
+    if (!saved || saved === "#FDFBF7") {
+      return "#FAF3E0";
+    }
+    return saved;
   });
   const [isBgPickerOpen, setIsBgPickerOpen] = useState(false);
 
@@ -407,8 +411,8 @@ export default function App() {
     let unsubscribeFirestore: (() => void) | null = null;
     try {
       unsubscribeFirestore = subscribeCoursesFromFirestore(async (firestoreCourses) => {
-        // Only accept cloud updates if local edits haven't occurred in the last 4 seconds
-        if (Date.now() - lastLocalMutationTime.current > 4000) {
+        // Only accept cloud updates if local edits haven't occurred in the last 10 seconds
+        if (Date.now() - lastLocalMutationTime.current > 10000) {
           if (firestoreCourses && hasAllDefaultCourses(firestoreCourses)) {
             const supabaseMaterials = await fetchAllMaterialsFromSupabaseDB();
             const merged = mergeSupabaseMaterialsIntoCourses(firestoreCourses as Course[], supabaseMaterials);
@@ -424,8 +428,8 @@ export default function App() {
     }
 
     const handleSyncOnFocus = () => {
-      // Fetch from cloud if user hasn't made a local edit in the last 5 seconds
-      if (Date.now() - lastLocalMutationTime.current > 5000) {
+      // Fetch from cloud if user hasn't made a local edit in the last 10 seconds
+      if (Date.now() - lastLocalMutationTime.current > 10000) {
         fetchCurriculumFromServer();
       }
     };

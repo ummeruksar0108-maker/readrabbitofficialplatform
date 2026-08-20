@@ -1,4 +1,4 @@
-import { Course, StudyMaterial } from "./types";
+import { Course, StudyMaterial, Unit } from "./types";
 
 export const initialCourses: Course[] = [
   {
@@ -9675,22 +9675,36 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
 
       // 1. English (Language I) Card
       let engIdx = subjects.findIndex((s) =>
-        s.name.toLowerCase().includes("english") ||
-        s.name.toLowerCase().includes("language i") ||
-        s.name.toLowerCase().includes("language 1") ||
-        s.id.includes("language_1") ||
-        s.id.includes("english")
+        (s.name && (
+          s.name.toLowerCase().includes("english") ||
+          s.name.toLowerCase().includes("language i") ||
+          s.name.toLowerCase() === "language 1"
+        )) ||
+        (s.id && (
+          s.id.includes("language_1") ||
+          s.id.includes("english")
+        ))
       );
 
       if (engIdx >= 0) {
+        const existingEng = subjects[engIdx];
+        const defaultEngUnits: Unit[] = [
+          { id: `${course.id}_eng_s${semNum}_tb`, number: "00", name: "Textbook", description: `Semester ${semNum} English Prescribed Reference Textbook`, masteryPercent: 0, status: "In Progress", kind: "textbook" },
+          { id: `${course.id}_eng_s${semNum}_ch1`, number: "01", name: "Chapter 1", description: "Prose & Literature Analysis", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+          { id: `${course.id}_eng_s${semNum}_ch2`, number: "02", name: "Chapter 2", description: "Grammar & Language Structure", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+          { id: `${course.id}_eng_s${semNum}_ch3`, number: "03", name: "Chapter 3", description: "Reading Comprehension & Vocabulary", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+          { id: `${course.id}_eng_s${semNum}_ch4`, number: "04", name: "Chapter 4", description: "Professional Writing & Communication", masteryPercent: 0, status: "In Progress", kind: "chapter" }
+        ];
+
         subjects[engIdx] = {
-          ...subjects[engIdx],
-          name: "English (Language I)",
-          description: subjects[engIdx].description || `Semester ${semNum} English Language coursework and chapters.`,
-          contentMode: "chapters",
-          icon: "Languages",
-          bgColor: subjects[engIdx].bgColor || "bg-pink-50 text-pink-800",
-          textColor: subjects[engIdx].textColor || "text-pink-800",
+          ...existingEng,
+          name: existingEng.name || "English (Language I)",
+          description: existingEng.description || `Semester ${semNum} English Language coursework and chapters.`,
+          contentMode: existingEng.contentMode || "chapters",
+          icon: existingEng.icon || "Languages",
+          bgColor: existingEng.bgColor || "bg-pink-50 text-pink-800",
+          textColor: existingEng.textColor || "text-pink-800",
+          units: (existingEng.units && existingEng.units.length > 0) ? existingEng.units : defaultEngUnits
         };
       } else {
         subjects.push({
@@ -9708,10 +9722,10 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
           textbooks: [],
           units: [
             { id: `${course.id}_eng_s${semNum}_tb`, number: "00", name: "Textbook", description: `Semester ${semNum} English Prescribed Reference Textbook`, masteryPercent: 0, status: "In Progress", kind: "textbook" },
-            { id: `${course.id}_eng_s${semNum}_ch1`, number: "01", name: "Chapter 1", description: "Prose & Literature Analysis", masteryPercent: 0, status: "Locked", kind: "chapter" },
-            { id: `${course.id}_eng_s${semNum}_ch2`, number: "02", name: "Chapter 2", description: "Grammar & Language Structure", masteryPercent: 0, status: "Locked", kind: "chapter" },
-            { id: `${course.id}_eng_s${semNum}_ch3`, number: "03", name: "Chapter 3", description: "Reading Comprehension & Vocabulary", masteryPercent: 0, status: "Locked", kind: "chapter" },
-            { id: `${course.id}_eng_s${semNum}_ch4`, number: "04", name: "Chapter 4", description: "Professional Writing & Communication", masteryPercent: 0, status: "Locked", kind: "chapter" }
+            { id: `${course.id}_eng_s${semNum}_ch1`, number: "01", name: "Chapter 1", description: "Prose & Literature Analysis", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+            { id: `${course.id}_eng_s${semNum}_ch2`, number: "02", name: "Chapter 2", description: "Grammar & Language Structure", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+            { id: `${course.id}_eng_s${semNum}_ch3`, number: "03", name: "Chapter 3", description: "Reading Comprehension & Vocabulary", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+            { id: `${course.id}_eng_s${semNum}_ch4`, number: "04", name: "Chapter 4", description: "Professional Writing & Communication", masteryPercent: 0, status: "In Progress", kind: "chapter" }
           ],
           materials: []
         });
@@ -9719,21 +9733,79 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
 
       // 2. Language II Card
       let lang2Idx = subjects.findIndex((s) =>
-        s.name.toLowerCase().includes("language ii") ||
-        s.name.toLowerCase().includes("language 2") ||
-        s.id.includes("language_2") ||
-        s.id.includes("lang2")
+        (s.name && (
+          s.name.toLowerCase().includes("language ii") ||
+          s.name.toLowerCase().includes("language 2") ||
+          s.name.toLowerCase().includes("second language")
+        )) ||
+        (s.id && (
+          s.id.includes("language_2") ||
+          s.id.includes("lang2")
+        ))
       );
 
+      const defaultLang2Units: Unit[] = [
+        {
+          id: `${course.id}_lang2_s${semNum}_kan`,
+          number: "01",
+          name: "Kannada",
+          description: "Kannada textbook and chapter materials.",
+          masteryPercent: 0,
+          status: "In Progress",
+          kind: "language",
+          children: [
+            { id: `${course.id}_kan_s${semNum}_tb`, number: "00", name: "Textbook", description: "Kannada Textbook", masteryPercent: 0, status: "In Progress", kind: "textbook" },
+            { id: `${course.id}_kan_s${semNum}_ch1`, number: "01", name: "Chapter 1", description: "Kannada Chapter 1", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+            { id: `${course.id}_kan_s${semNum}_ch2`, number: "02", name: "Chapter 2", description: "Kannada Chapter 2", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+            { id: `${course.id}_kan_s${semNum}_ch3`, number: "03", name: "Chapter 3", description: "Kannada Chapter 3", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+            { id: `${course.id}_kan_s${semNum}_ch4`, number: "04", name: "Chapter 4", description: "Kannada Chapter 4", masteryPercent: 0, status: "In Progress", kind: "chapter" }
+          ]
+        },
+        {
+          id: `${course.id}_lang2_s${semNum}_hin`,
+          number: "02",
+          name: "Hindi",
+          description: "Hindi textbook and chapter materials.",
+          masteryPercent: 0,
+          status: "In Progress",
+          kind: "language",
+          children: [
+            { id: `${course.id}_hin_s${semNum}_tb`, number: "00", name: "Textbook", description: "Hindi Textbook", masteryPercent: 0, status: "In Progress", kind: "textbook" },
+            { id: `${course.id}_hin_s${semNum}_ch1`, number: "01", name: "Chapter 1", description: "Hindi Chapter 1", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+            { id: `${course.id}_hin_s${semNum}_ch2`, number: "02", name: "Chapter 2", description: "Hindi Chapter 2", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+            { id: `${course.id}_hin_s${semNum}_ch3`, number: "03", name: "Chapter 3", description: "Hindi Chapter 3", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+            { id: `${course.id}_hin_s${semNum}_ch4`, number: "04", name: "Chapter 4", description: "Hindi Chapter 4", masteryPercent: 0, status: "In Progress", kind: "chapter" }
+          ]
+        },
+        {
+          id: `${course.id}_lang2_s${semNum}_ae`,
+          number: "03",
+          name: "Additional English",
+          description: "Additional English textbook and chapter materials.",
+          masteryPercent: 0,
+          status: "In Progress",
+          kind: "language",
+          children: [
+            { id: `${course.id}_ae_s${semNum}_tb`, number: "00", name: "Textbook", description: "Additional English Textbook", masteryPercent: 0, status: "In Progress", kind: "textbook" },
+            { id: `${course.id}_ae_s${semNum}_ch1`, number: "01", name: "Chapter 1", description: "Additional English Chapter 1", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+            { id: `${course.id}_ae_s${semNum}_ch2`, number: "02", name: "Chapter 2", description: "Additional English Chapter 2", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+            { id: `${course.id}_ae_s${semNum}_ch3`, number: "03", name: "Chapter 3", description: "Additional English Chapter 3", masteryPercent: 0, status: "In Progress", kind: "chapter" },
+            { id: `${course.id}_ae_s${semNum}_ch4`, number: "04", name: "Chapter 4", description: "Additional English Chapter 4", masteryPercent: 0, status: "In Progress", kind: "chapter" }
+          ]
+        }
+      ];
+
       if (lang2Idx >= 0) {
+        const existingLang2 = subjects[lang2Idx];
         subjects[lang2Idx] = {
-          ...subjects[lang2Idx],
-          name: "Language II",
-          description: "Kannada, Hindi, or Additional English language options.",
-          contentMode: "languages",
-          icon: "Languages",
-          bgColor: subjects[lang2Idx].bgColor || "bg-purple-50 text-purple-800",
-          textColor: subjects[lang2Idx].textColor || "text-purple-800",
+          ...existingLang2,
+          name: existingLang2.name || "Language II",
+          description: existingLang2.description || "Kannada, Hindi, or Additional English language options.",
+          contentMode: existingLang2.contentMode || "languages",
+          icon: existingLang2.icon || "Languages",
+          bgColor: existingLang2.bgColor || "bg-purple-50 text-purple-800",
+          textColor: existingLang2.textColor || "text-purple-800",
+          units: (existingLang2.units && existingLang2.units.length > 0) ? existingLang2.units : defaultLang2Units
         };
       } else {
         subjects.push({
@@ -9749,56 +9821,7 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
           progressPercent: 0,
           contentMode: "languages",
           textbooks: [],
-          units: [
-            {
-              id: `${course.id}_lang2_s${semNum}_kan`,
-              number: "01",
-              name: "Kannada",
-              description: "Kannada textbook and chapter materials.",
-              masteryPercent: 0,
-              status: "Locked",
-              kind: "language",
-              children: [
-                { id: `${course.id}_kan_s${semNum}_tb`, number: "00", name: "Textbook", description: "Kannada Textbook", masteryPercent: 0, status: "Locked", kind: "textbook" },
-                { id: `${course.id}_kan_s${semNum}_ch1`, number: "01", name: "Chapter 1", description: "Kannada Chapter 1", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_kan_s${semNum}_ch2`, number: "02", name: "Chapter 2", description: "Kannada Chapter 2", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_kan_s${semNum}_ch3`, number: "03", name: "Chapter 3", description: "Kannada Chapter 3", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_kan_s${semNum}_ch4`, number: "04", name: "Chapter 4", description: "Kannada Chapter 4", masteryPercent: 0, status: "Locked", kind: "chapter" }
-              ]
-            },
-            {
-              id: `${course.id}_lang2_s${semNum}_hin`,
-              number: "02",
-              name: "Hindi",
-              description: "Hindi textbook and chapter materials.",
-              masteryPercent: 0,
-              status: "Locked",
-              kind: "language",
-              children: [
-                { id: `${course.id}_hin_s${semNum}_tb`, number: "00", name: "Textbook", description: "Hindi Textbook", masteryPercent: 0, status: "Locked", kind: "textbook" },
-                { id: `${course.id}_hin_s${semNum}_ch1`, number: "01", name: "Chapter 1", description: "Hindi Chapter 1", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_hin_s${semNum}_ch2`, number: "02", name: "Chapter 2", description: "Hindi Chapter 2", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_hin_s${semNum}_ch3`, number: "03", name: "Chapter 3", description: "Hindi Chapter 3", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_hin_s${semNum}_ch4`, number: "04", name: "Chapter 4", description: "Hindi Chapter 4", masteryPercent: 0, status: "Locked", kind: "chapter" }
-              ]
-            },
-            {
-              id: `${course.id}_lang2_s${semNum}_ae`,
-              number: "03",
-              name: "Additional English",
-              description: "Additional English textbook and chapter materials.",
-              masteryPercent: 0,
-              status: "Locked",
-              kind: "language",
-              children: [
-                { id: `${course.id}_ae_s${semNum}_tb`, number: "00", name: "Textbook", description: "Additional English Textbook", masteryPercent: 0, status: "Locked", kind: "textbook" },
-                { id: `${course.id}_ae_s${semNum}_ch1`, number: "01", name: "Chapter 1", description: "Additional English Chapter 1", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_ae_s${semNum}_ch2`, number: "02", name: "Chapter 2", description: "Additional English Chapter 2", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_ae_s${semNum}_ch3`, number: "03", name: "Chapter 3", description: "Additional English Chapter 3", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_ae_s${semNum}_ch4`, number: "04", name: "Chapter 4", description: "Additional English Chapter 4", masteryPercent: 0, status: "Locked", kind: "chapter" }
-              ]
-            }
-          ],
+          units: defaultLang2Units,
           materials: []
         });
       }

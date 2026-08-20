@@ -234,7 +234,7 @@ export default function SubjectHub({
     return (subject.units || []).filter(u => !u.name.toLowerCase().includes("textbook") && u.kind !== "textbook");
   }, [subject, isLabSubject, isLang1Subject]);
 
-  // Language II Options computation: Kannada, Hindi, Additional English
+  // Language II Options computation: Kannada, Hindi, Additional English + dynamic custom language options
   const lang2Options = useMemo(() => {
     if (!isLang2Subject) return [];
 
@@ -244,20 +244,25 @@ export default function SubjectHub({
       { id: `${subject.id}_ae`, name: "Additional English", code: "ae" }
     ];
 
-    return defaultLangs.map((lang, idx) => {
-      const existingLangUnit = subject.units.find(u => 
-        u.name.toLowerCase().includes(lang.name.toLowerCase()) || 
-        u.id.includes(lang.code) ||
-        u.id === `${subject.id}_${lang.code}` ||
-        u.id === `lang2_s1_${lang.code}`
+    const existingUnits = subject.units || [];
+    const matchedUnitIds = new Set<string>();
+
+    const mappedDefaults = defaultLangs.map((lang, idx) => {
+      const existingLangUnit = existingUnits.find(u => 
+        (u.name && u.name.toLowerCase().includes(lang.name.toLowerCase())) || 
+        (u.id && (u.id.includes(lang.code) || u.id === `${subject.id}_${lang.code}` || u.id.endsWith(`_${lang.code}`)))
       );
 
+      if (existingLangUnit) {
+        matchedUnitIds.add(existingLangUnit.id);
+      }
+
       const defaultChildren: Unit[] = [
-        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Textbook`, masteryPercent: 0, status: "In Progress", materials: subject.textbooks || [] },
-        { id: `${subject.id}_${lang.code}_ch1`, number: "01", name: "Chapter 1", description: `${lang.name} Chapter 1 Study Material`, masteryPercent: 0, status: "In Progress" },
-        { id: `${subject.id}_${lang.code}_ch2`, number: "02", name: "Chapter 2", description: `${lang.name} Chapter 2 Study Material`, masteryPercent: 0, status: "In Progress" },
-        { id: `${subject.id}_${lang.code}_ch3`, number: "03", name: "Chapter 3", description: `${lang.name} Chapter 3 Study Material`, masteryPercent: 0, status: "In Progress" },
-        { id: `${subject.id}_${lang.code}_ch4`, number: "04", name: "Chapter 4", description: `${lang.name} Chapter 4 Study Material`, masteryPercent: 0, status: "In Progress" }
+        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Textbook`, masteryPercent: 0, status: "In Progress", kind: "textbook", materials: subject.textbooks || [] },
+        { id: `${subject.id}_${lang.code}_ch1`, number: "01", name: "Chapter 1", description: `${lang.name} Chapter 1 Study Material`, masteryPercent: 0, status: "In Progress", kind: "chapter" },
+        { id: `${subject.id}_${lang.code}_ch2`, number: "02", name: "Chapter 2", description: `${lang.name} Chapter 2 Study Material`, masteryPercent: 0, status: "In Progress", kind: "chapter" },
+        { id: `${subject.id}_${lang.code}_ch3`, number: "03", name: "Chapter 3", description: `${lang.name} Chapter 3 Study Material`, masteryPercent: 0, status: "In Progress", kind: "chapter" },
+        { id: `${subject.id}_${lang.code}_ch4`, number: "04", name: "Chapter 4", description: `${lang.name} Chapter 4 Study Material`, masteryPercent: 0, status: "In Progress", kind: "chapter" }
       ];
 
       const rawChildren = existingLangUnit?.children && existingLangUnit.children.length > 0
@@ -266,7 +271,7 @@ export default function SubjectHub({
 
       const hasTb = rawChildren.some(c => c.name.toLowerCase().includes("textbook") || c.kind === "textbook");
       const children = hasTb ? rawChildren : [
-        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Textbook`, masteryPercent: 0, status: "In Progress" },
+        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Textbook`, masteryPercent: 0, status: "In Progress", kind: "textbook" },
         ...rawChildren
       ];
 
@@ -279,6 +284,19 @@ export default function SubjectHub({
         children
       };
     });
+
+    const extraCustomUnits = existingUnits
+      .filter(u => !matchedUnitIds.has(u.id))
+      .map((u, idx) => ({
+        id: u.id,
+        name: u.name,
+        number: u.number || `0${mappedDefaults.length + idx + 1}`,
+        description: u.description || `${u.name} course materials`,
+        status: u.status || "In Progress",
+        children: u.children || []
+      }));
+
+    return [...mappedDefaults, ...extraCustomUnits];
   }, [subject, isLang2Subject]);
 
   // Master resolver for current effective units
@@ -297,6 +315,18 @@ export default function SubjectHub({
     }
     if (subject.units && subject.units.length > 0) {
       return subject.units;
+    }
+    if (isLang1Subject) {
+      const defaultTb: Unit = {
+        id: `${subject.id}_tb`,
+        number: "00",
+        name: "Textbook",
+        description: `${subject.name} Prescribed Reference Textbook`,
+        masteryPercent: 0,
+        status: "In Progress",
+        kind: "textbook"
+      };
+      return [defaultTb, ...displayUnits];
     }
     return displayUnits;
   };
@@ -317,11 +347,26 @@ export default function SubjectHub({
       return;
     }
     setEditingUnit(null);
-    setTargetParentUnitId(parentUnitId || null);
-    setTargetParentUnitName(parentUnitName || "");
+
+    let resolvedParentId = parentUnitId || null;
+    let resolvedParentName = parentUnitName || "";
+
+    if (isLang2Subject && !resolvedParentId) {
+      if (expandedLangId) {
+        resolvedParentId = expandedLangId;
+        const pOpt = lang2Options.find(l => l.id === expandedLangId);
+        resolvedParentName = pOpt?.name || "";
+      } else if (lang2Options.length > 0) {
+        resolvedParentId = lang2Options[0].id;
+        resolvedParentName = lang2Options[0].name;
+      }
+    }
+
+    setTargetParentUnitId(resolvedParentId);
+    setTargetParentUnitName(resolvedParentName);
     
-    if (parentUnitId && isLang2Subject) {
-      const parentOption = lang2Options.find(l => l.id === parentUnitId);
+    if (resolvedParentId && isLang2Subject) {
+      const parentOption = lang2Options.find(l => l.id === resolvedParentId);
       const childCount = parentOption?.children ? parentOption.children.length : 0;
       setNewUnitNumber(`0${childCount}`);
       setNewUnitName(`Chapter ${childCount}: `);
@@ -414,6 +459,7 @@ export default function SubjectHub({
         description: newUnitDesc.trim() || `Comprehensive syllabus materials for ${newUnitName.trim()}`,
         masteryPercent: 0,
         status: "In Progress",
+        kind: isLang2Subject ? "chapter" : "unit",
         topics: topicsArray,
         materials: [],
         importantQuestions: [],
@@ -431,17 +477,21 @@ export default function SubjectHub({
           }
           return p;
         });
-      } else if (isLang2Subject && expandedLangId) {
-        // If in Language II, attach to currently opened language
-        updatedUnits = baseUnits.map(p => {
-          if (p.id === expandedLangId) {
-            return {
-              ...p,
-              children: [...(p.children || []), newUnitCard]
-            };
-          }
-          return p;
-        });
+      } else if (isLang2Subject) {
+        const targetId = expandedLangId || (lang2Options[0]?.id);
+        if (targetId) {
+          updatedUnits = baseUnits.map(p => {
+            if (p.id === targetId) {
+              return {
+                ...p,
+                children: [...(p.children || []), newUnitCard]
+              };
+            }
+            return p;
+          });
+        } else {
+          updatedUnits = [...baseUnits, newUnitCard];
+        }
       } else {
         updatedUnits = [...baseUnits, newUnitCard];
       }
