@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { logDiagnostic } from "./firebase";
-import { Course, StudyMaterial } from "../types";
+import { Course, StudyMaterial, Unit } from "../types";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
@@ -418,6 +418,15 @@ export function mergeSupabaseMaterialsIntoCourses(
   };
 
   // Clean stale uploaded materials that were deleted from Supabase
+  const cleanUnitMaterialsRecursively = (u: Unit) => {
+    if (u.materials) {
+      u.materials = u.materials.filter(isMaterialValidInSupabase);
+    }
+    if (u.children && u.children.length > 0) {
+      u.children.forEach(cleanUnitMaterialsRecursively);
+    }
+  };
+
   for (const course of coursesCopy) {
     for (const sem of course.semesters) {
       for (const subject of sem.subjects) {
@@ -427,14 +436,33 @@ export function mergeSupabaseMaterialsIntoCourses(
         if (subject.textbooks) {
           subject.textbooks = subject.textbooks.filter(isMaterialValidInSupabase);
         }
-        for (const unit of subject.units) {
-          if (unit.materials) {
-            unit.materials = unit.materials.filter(isMaterialValidInSupabase);
-          }
+        for (const unit of (subject.units || [])) {
+          cleanUnitMaterialsRecursively(unit);
         }
       }
     }
   }
+
+  // Helper to insert material recursively into unit tree
+  const insertIntoUnitRecursive = (units: Unit[], matItem: StudyMaterial, targetUnitId: string, isSameFn: (existing: StudyMaterial) => boolean): boolean => {
+    for (const u of units) {
+      if (u.id === targetUnitId) {
+        u.materials = u.materials || [];
+        const uIdx = u.materials.findIndex(isSameFn);
+        if (uIdx >= 0) {
+          u.materials[uIdx] = { ...u.materials[uIdx], ...matItem };
+        } else {
+          u.materials.push(matItem);
+        }
+        return true;
+      }
+      if (u.children && u.children.length > 0) {
+        const found = insertIntoUnitRecursive(u.children, matItem, targetUnitId, isSameFn);
+        if (found) return true;
+      }
+    }
+    return false;
+  };
 
   // Merge each material from Supabase DB into the appropriate location
   for (const mat of supabaseMaterials) {
@@ -496,16 +524,8 @@ export function mergeSupabaseMaterialsIntoCourses(
                 subject.materials.push(matItem);
               }
             } else if (mat.unitId) {
-              const targetUnit = subject.units.find(u => u.id === mat.unitId);
-              if (targetUnit) {
-                targetUnit.materials = targetUnit.materials || [];
-                const uIdx = targetUnit.materials.findIndex(isSameMaterial);
-                if (uIdx >= 0) {
-                  targetUnit.materials[uIdx] = { ...targetUnit.materials[uIdx], ...matItem };
-                } else {
-                  targetUnit.materials.push(matItem);
-                }
-              } else {
+              const inserted = insertIntoUnitRecursive(subject.units || [], matItem, mat.unitId, isSameMaterial);
+              if (!inserted) {
                 subject.materials = subject.materials || [];
                 const mIdx = subject.materials.findIndex(isSameMaterial);
                 if (mIdx >= 0) {

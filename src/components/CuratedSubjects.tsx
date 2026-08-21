@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "motion/react";
 import { Subject } from "../types";
 import * as LucideIcons from "lucide-react";
-import { ChevronRight, Plus, CheckCircle, Trash2, ArrowLeft, Terminal, Folder } from "lucide-react";
+import { ChevronRight, Plus, CheckCircle, Trash2, ArrowLeft, Terminal, Folder, Search, X } from "lucide-react";
 
 interface CuratedSubjectsProps {
   subjects: Subject[];
@@ -26,10 +26,7 @@ export default function CuratedSubjects({
   semesterName = "Semester",
 }: CuratedSubjectsProps) {
   const [viewingPracticalLabs, setViewingPracticalLabs] = useState(false);
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, [viewingPracticalLabs, semesterName]);
+  const [localSearch, setLocalSearch] = useState("");
 
   const isLabSubject = (subject: Subject) => {
     return (
@@ -40,8 +37,25 @@ export default function CuratedSubjects({
     );
   };
 
-  const theorySubjects = subjects.filter((s) => !isLabSubject(s));
-  const labSubjects = subjects.filter((s) => isLabSubject(s));
+  const theorySubjects = useMemo(() => {
+    return subjects
+      .filter((s) => !isLabSubject(s))
+      .filter((s) => {
+        if (!localSearch.trim()) return true;
+        const q = localSearch.toLowerCase();
+        return s.name.toLowerCase().includes(q) || (s.description && s.description.toLowerCase().includes(q));
+      });
+  }, [subjects, localSearch]);
+
+  const labSubjects = useMemo(() => {
+    return subjects
+      .filter((s) => isLabSubject(s))
+      .filter((s) => {
+        if (!localSearch.trim()) return true;
+        const q = localSearch.toLowerCase();
+        return s.name.toLowerCase().includes(q) || (s.description && s.description.toLowerCase().includes(q));
+      });
+  }, [subjects, localSearch]);
 
   if (viewingPracticalLabs) {
     return (
@@ -66,12 +80,29 @@ export default function CuratedSubjects({
         </nav>
 
         {/* Header Info */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
           <div>
             <h2 className="font-sans text-3xl md:text-4xl font-extrabold text-[#1E1412] mb-2">📁 Practical Labs</h2>
             <p className="text-[#2A1C18] text-sm md:text-base max-w-lg mt-1 font-sans">
               Select a practical lab subject to access Manuals, Program Outputs, and Viva Questions for {semesterName}.
             </p>
+          </div>
+
+          {/* Quick Search for Labs */}
+          <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-2xl border border-[#E2D4C3] shadow-xs max-w-xs w-full">
+            <Search size={16} className="text-[#735E55]" />
+            <input
+              type="text"
+              placeholder="Filter practical labs..."
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              className="bg-transparent border-none text-xs font-sans focus:outline-none placeholder-[#735E55] w-full"
+            />
+            {localSearch && (
+              <button onClick={() => setLocalSearch("")} className="text-gray-400 hover:text-gray-600">
+                <X size={14} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -173,7 +204,7 @@ export default function CuratedSubjects({
       </nav>
 
       {/* Header Info */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
         <div>
           <h2 className="font-sans text-3xl md:text-4xl font-extrabold text-[#1E1412] mb-2">Curated Subjects</h2>
           <p className="text-[#2A1C18] text-sm md:text-base max-w-lg mt-1 font-sans">
@@ -181,15 +212,34 @@ export default function CuratedSubjects({
           </p>
         </div>
 
-        {/* Overall Semester Progress */}
-        <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl shadow-xs border border-[#E2D4C3]">
-          <span className="font-sans text-xs font-bold text-[#735E55] tracking-wider uppercase">
-            Overall Semester Progress
-          </span>
-          <div className="w-32 h-2.5 bg-[#F4ECE1] rounded-full overflow-hidden shadow-inner">
-            <div className="h-full bg-gradient-to-r from-[#D97706] to-[#1E1412] rounded-full" style={{ width: `${overallProgress}%` }}></div>
+        <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+          {/* Quick Filter Search */}
+          <div className="flex items-center gap-2 bg-white px-3.5 py-2.5 rounded-2xl border border-[#E2D4C3] shadow-xs w-full sm:w-64">
+            <Search size={16} className="text-[#735E55] shrink-0" />
+            <input
+              type="text"
+              placeholder="Search subjects in semester..."
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              className="bg-transparent border-none text-xs font-sans focus:outline-none placeholder-[#735E55] w-full"
+            />
+            {localSearch && (
+              <button onClick={() => setLocalSearch("")} className="text-gray-400 hover:text-gray-600">
+                <X size={14} />
+              </button>
+            )}
           </div>
-          <span className="font-sans text-sm font-extrabold text-[#D97706]">{overallProgress}%</span>
+
+          {/* Overall Semester Progress */}
+          <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-2xl shadow-xs border border-[#E2D4C3] shrink-0">
+            <span className="font-sans text-xs font-bold text-[#735E55] tracking-wider uppercase">
+              Progress
+            </span>
+            <div className="w-24 h-2.5 bg-[#F4ECE1] rounded-full overflow-hidden shadow-inner">
+              <div className="h-full bg-gradient-to-r from-[#D97706] to-[#1E1412] rounded-full" style={{ width: `${overallProgress}%` }}></div>
+            </div>
+            <span className="font-sans text-xs font-extrabold text-[#D97706]">{overallProgress}%</span>
+          </div>
         </div>
       </div>
 

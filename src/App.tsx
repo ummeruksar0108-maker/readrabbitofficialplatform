@@ -15,6 +15,7 @@ import QuestionPaperLibrary from "./components/QuestionPaperLibrary";
 import AdminPortal from "./components/AdminPortal";
 import AddSubjectModal from "./components/AddSubjectModal";
 import PasswordResetModal from "./components/PasswordResetModal";
+import GlobalSearchModal from "./components/GlobalSearchModal";
 import FirebaseDiagnosticsPanel from "./components/FirebaseDiagnosticsPanel";
 import { Logo } from "./components/Logo";
 import { logDiagnostic, saveCoursesToFirestore, loadCoursesFromFirestore, subscribeCoursesFromFirestore, saveNotificationsToFirestore, subscribeNotificationsFromFirestore } from "./lib/firebase";
@@ -42,11 +43,7 @@ const hasAllDefaultCourses = (value: unknown): value is Course[] => {
 export default function App() {
   // Website Background Color State with Local Storage persistence
   const [bgColor, setBgColor] = useState<string>(() => {
-    const saved = localStorage.getItem("read_rabbit_bg_color");
-    if (!saved || saved === "#FDFBF7") {
-      return "#FAF3E0";
-    }
-    return saved;
+    return localStorage.getItem("read_rabbit_bg_color") || "#FAF3E0";
   });
   const [isBgPickerOpen, setIsBgPickerOpen] = useState(false);
 
@@ -152,6 +149,22 @@ export default function App() {
   });
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Global Keyboard Shortcut for Search (Ctrl+K, Cmd+K, /)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      } else if (e.key === "/" && !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Persistent dynamic notifications state
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
@@ -411,8 +424,8 @@ export default function App() {
     let unsubscribeFirestore: (() => void) | null = null;
     try {
       unsubscribeFirestore = subscribeCoursesFromFirestore(async (firestoreCourses) => {
-        // Only accept cloud updates if local edits haven't occurred in the last 10 seconds
-        if (Date.now() - lastLocalMutationTime.current > 10000) {
+        // Only accept cloud updates if local edits haven't occurred in the last 4 seconds
+        if (Date.now() - lastLocalMutationTime.current > 4000) {
           if (firestoreCourses && hasAllDefaultCourses(firestoreCourses)) {
             const supabaseMaterials = await fetchAllMaterialsFromSupabaseDB();
             const merged = mergeSupabaseMaterialsIntoCourses(firestoreCourses as Course[], supabaseMaterials);
@@ -428,8 +441,8 @@ export default function App() {
     }
 
     const handleSyncOnFocus = () => {
-      // Fetch from cloud if user hasn't made a local edit in the last 10 seconds
-      if (Date.now() - lastLocalMutationTime.current > 10000) {
+      // Fetch from cloud if user hasn't made a local edit in the last 5 seconds
+      if (Date.now() - lastLocalMutationTime.current > 5000) {
         fetchCurriculumFromServer();
       }
     };
@@ -512,12 +525,6 @@ export default function App() {
         "",
         targetHash || window.location.pathname + window.location.search
       );
-    }
-
-    // Always ensure pages start cleanly scrolled to top when navigating
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    if (document.documentElement) {
-      document.documentElement.scrollTop = 0;
     }
   }, [selectedCourseId, selectedSemesterId, selectedSubjectId, isSplash, activeTab]);
 
@@ -771,6 +778,34 @@ export default function App() {
     pushAppHistory(selectedCourseId, selectedSemesterId, subjectId, "units");
   };
 
+  // Global Search Navigation Handlers
+  const handleNavigateFromSearchSubject = (courseId: string, semesterId: number, subjectId: string) => {
+    setSelectedCourseId(courseId);
+    setSelectedSemesterId(semesterId);
+    setSelectedSubjectId(subjectId);
+    setActiveTab("units");
+    pushAppHistory(courseId, semesterId, subjectId, "units");
+    setIsSearchOpen(false);
+  };
+
+  const handleNavigateFromSearchUnit = (courseId: string, semesterId: number, subjectId: string, unitId: string) => {
+    setSelectedCourseId(courseId);
+    setSelectedSemesterId(semesterId);
+    setSelectedSubjectId(subjectId);
+    setActiveTab("units");
+    pushAppHistory(courseId, semesterId, subjectId, "units");
+    setIsSearchOpen(false);
+  };
+
+  const handleNavigateFromSearchLibrary = (courseId?: string, query?: string) => {
+    if (courseId) {
+      setSelectedCourseId(courseId);
+    }
+    setActiveTab("library");
+    pushAppHistory(courseId || selectedCourseId, null, null, "library");
+    setIsSearchOpen(false);
+  };
+
   // Admin handlers
   const handleUpdateCourses = async (updatedCourses: Course[]): Promise<boolean> => {
     lastLocalMutationTime.current = Date.now();
@@ -969,18 +1004,35 @@ export default function App() {
             </div>
           </div>
 
-          {/* Quick AI Search & Cloud Sync & Notifications */}
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 bg-[#fff2e1]/60 px-3 py-1.5 rounded-xl border border-[#dac1c1]/40 focus-within:border-[#fd9b65] transition-colors max-w-xs">
-              <Search size={16} className="text-[#877272]" />
-              <input
-                type="text"
-                placeholder="Search syllabus & notes..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent border-none text-xs font-sans focus:outline-none placeholder-[#877272] w-44"
-              />
-            </div>
+          {/* Quick AI & Academic Global Search & Cloud Sync & Notifications */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Desktop Search Bar Trigger */}
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(true)}
+              className="hidden sm:flex items-center justify-between gap-3 bg-[#fff2e1]/70 hover:bg-[#fff2e1] px-3 py-1.5 rounded-xl border border-[#dac1c1]/50 hover:border-[#fd9b65] transition-all cursor-pointer group shadow-2xs text-left"
+              title="Search syllabus, notes, textbooks, and PYQs (Ctrl+K)"
+            >
+              <div className="flex items-center gap-2">
+                <Search size={15} className="text-[#95491a] group-hover:scale-110 transition-transform shrink-0" />
+                <span className="text-xs font-sans font-medium text-[#877272] group-hover:text-[#40010d] transition-colors w-40 truncate">
+                  {searchQuery ? searchQuery : "Search syllabus, notes & PYQs..."}
+                </span>
+              </div>
+              <div className="flex items-center gap-0.5 text-[10px] font-mono font-bold text-[#877272] bg-white/90 border border-[#dac1c1]/40 px-1.5 py-0.5 rounded-md shadow-2xs shrink-0">
+                <span className="text-[9px]">⌘</span>K
+              </div>
+            </button>
+
+            {/* Mobile Search Button Trigger */}
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(true)}
+              className="sm:hidden p-2 text-[#877272] hover:text-[#40010d] rounded-xl hover:bg-[#f8e6cb]/40 transition-colors cursor-pointer"
+              title="Open Academic Search"
+            >
+              <Search size={20} className="text-[#95491a]" />
+            </button>
 
 
 
@@ -1378,6 +1430,21 @@ export default function App() {
             isOpen={isAddSubjectOpen}
             onClose={() => setIsAddSubjectOpen(false)}
             onAddSubject={handleAddSubject}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Universal Global Academic Search Modal */}
+      <AnimatePresence>
+        {isSearchOpen && (
+          <GlobalSearchModal
+            isOpen={isSearchOpen}
+            onClose={() => setIsSearchOpen(false)}
+            courses={courses}
+            initialQuery={searchQuery}
+            onNavigateToSubject={handleNavigateFromSearchSubject}
+            onNavigateToUnit={handleNavigateFromSearchUnit}
+            onNavigateToLibrary={handleNavigateFromSearchLibrary}
           />
         )}
       </AnimatePresence>

@@ -26,6 +26,7 @@ import {
   RefreshCw,
   AlertCircle,
   Plus,
+  PlusCircle,
   Trash2,
   Upload,
   Download,
@@ -115,266 +116,162 @@ export default function SubjectHub({
     setActiveYtVideo(null);
   };
 
-  // Determine subject classification
-  const isLabSubject = useMemo(() => {
-    return (
-      subject.isLab ||
-      subject.contentMode === "labs" ||
-      subject.name.toLowerCase().includes("lab") ||
-      subject.id.includes("lab")
-    );
-  }, [subject]);
-
-  const isLang1Subject = useMemo(() => {
-    return (
-      subject.contentMode === "chapters" ||
-      subject.name.toLowerCase().includes("language i") ||
-      subject.name.toLowerCase() === "language 1" ||
-      subject.id.startsWith("language_1") ||
-      subject.id.includes("lang1")
-    );
-  }, [subject]);
-
-  const isLang2Subject = useMemo(() => {
-    return (
-      subject.contentMode === "languages" ||
-      subject.name.toLowerCase().includes("language ii") ||
-      subject.name.toLowerCase() === "language 2" ||
-      subject.id.startsWith("language_2") ||
-      subject.id.includes("lang2")
-    );
-  }, [subject]);
-
-  // Language II expandable options state (starts collapsed by default)
-  const [expandedLangId, setExpandedLangId] = useState<string>("");
-
-  // Reset accordion state and scroll to top when opening a subject
-  useEffect(() => {
-    setExpandedLangId("");
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, [subject.id]);
-
-  // Recursive updater for top-level and nested units
-  function updateUnitsList(units: Unit[], targetId: string, updateFn: (u: Unit) => Unit): Unit[] {
-    return units.map(unit => {
-      if (unit.id === targetId) {
-        return updateFn(unit);
-      }
-      if (unit.children && unit.children.length > 0) {
-        return {
-          ...unit,
-          children: updateUnitsList(unit.children, targetId, updateFn)
-        };
-      }
-      return unit;
-    });
-  }
-
-  // Recursive deleter for top-level and nested units
-  function deleteFromUnitsList(units: Unit[], targetId: string): Unit[] {
-    return units
-      .filter(u => u.id !== targetId)
-      .map(u => ({
-        ...u,
-        children: u.children ? deleteFromUnitsList(u.children, targetId) : undefined
-      }));
-  }
-
-  // Display Units computation for Labs, Language I, and standard theory subjects
-  const displayUnits = useMemo(() => {
-    if (isLabSubject) {
-      if (subject.units && subject.units.length > 0) {
-        return subject.units;
-      }
-      const requiredLabSections = [
-        { name: "Manual", desc: "Comprehensive Laboratory Manual, experiment procedures, and theoretical instructions." },
-        { name: "Outputs", desc: "Sample code outputs, practical execution screenshots, and terminal results." },
-        { name: "Viva Questions", desc: "Essential viva voce questions, practical exam interview Q&A, and lab quizzes." }
-      ];
-
-      return requiredLabSections.map((sec, idx) => ({
-        id: `${subject.id}_lab_${idx + 1}`,
-        number: `0${idx + 1}`,
-        name: sec.name,
-        description: `${subject.name} - ${sec.desc}`,
-        masteryPercent: 0,
-        status: "In Progress" as const,
-        materials: [],
-        importantQuestions: [],
-        youtubeLinks: []
-      }));
-    }
-
-    if (isLang1Subject) {
-      // Filter out textbook unit (which is displayed separately in the Prescribed Reference section)
-      const nonTextbookUnits = (subject.units || []).filter(
-        u => u.kind !== "textbook" && !u.name.toLowerCase().includes("textbook")
-      );
-
-      // If units exist in subject.units, return ALL of them, preserving custom titles and newly added cards!
-      if (nonTextbookUnits.length > 0) {
-        return nonTextbookUnits;
-      }
-
-      // Default fallback if subject.units is empty
-      const chapterNames = ["Chapter 1", "Chapter 2", "Chapter 3", "Chapter 4"];
-      return chapterNames.map((chName, idx) => ({
-        id: `${subject.id}_ch_${idx + 1}`,
-        number: `0${idx + 1}`,
-        name: chName,
-        description: `${subject.name} - ${chName} Study Material & Notes`,
-        masteryPercent: 0,
-        status: "In Progress" as const,
-        materials: [],
-        importantQuestions: [],
-        youtubeLinks: []
-      }));
-    }
-
-    return (subject.units || []).filter(u => !u.name.toLowerCase().includes("textbook") && u.kind !== "textbook");
-  }, [subject, isLabSubject, isLang1Subject]);
-
-  // Language II Options computation: Kannada, Hindi, Additional English + dynamic custom language options
-  const lang2Options = useMemo(() => {
-    if (!isLang2Subject) return [];
-
-    const defaultLangs = [
-      { id: `${subject.id}_kan`, name: "Kannada", code: "kan" },
-      { id: `${subject.id}_hin`, name: "Hindi", code: "hin" },
-      { id: `${subject.id}_ae`, name: "Additional English", code: "ae" }
-    ];
-
-    const existingUnits = subject.units || [];
-    const matchedUnitIds = new Set<string>();
-
-    const mappedDefaults = defaultLangs.map((lang, idx) => {
-      const existingLangUnit = existingUnits.find(u => 
-        (u.name && u.name.toLowerCase().includes(lang.name.toLowerCase())) || 
-        (u.id && (u.id.includes(lang.code) || u.id === `${subject.id}_${lang.code}` || u.id.endsWith(`_${lang.code}`)))
-      );
-
-      if (existingLangUnit) {
-        matchedUnitIds.add(existingLangUnit.id);
-      }
-
-      const defaultChildren: Unit[] = [
-        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Textbook`, masteryPercent: 0, status: "In Progress", kind: "textbook", materials: subject.textbooks || [] },
-        { id: `${subject.id}_${lang.code}_ch1`, number: "01", name: "Chapter 1", description: `${lang.name} Chapter 1 Study Material`, masteryPercent: 0, status: "In Progress", kind: "chapter" },
-        { id: `${subject.id}_${lang.code}_ch2`, number: "02", name: "Chapter 2", description: `${lang.name} Chapter 2 Study Material`, masteryPercent: 0, status: "In Progress", kind: "chapter" },
-        { id: `${subject.id}_${lang.code}_ch3`, number: "03", name: "Chapter 3", description: `${lang.name} Chapter 3 Study Material`, masteryPercent: 0, status: "In Progress", kind: "chapter" },
-        { id: `${subject.id}_${lang.code}_ch4`, number: "04", name: "Chapter 4", description: `${lang.name} Chapter 4 Study Material`, masteryPercent: 0, status: "In Progress", kind: "chapter" }
-      ];
-
-      const rawChildren = existingLangUnit?.children && existingLangUnit.children.length > 0
-        ? existingLangUnit.children
-        : defaultChildren;
-
-      const hasTb = rawChildren.some(c => c.name.toLowerCase().includes("textbook") || c.kind === "textbook");
-      const children = hasTb ? rawChildren : [
-        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Textbook`, masteryPercent: 0, status: "In Progress", kind: "textbook" },
-        ...rawChildren
-      ];
-
-      return {
-        id: existingLangUnit?.id || `${subject.id}_${lang.code}`,
-        name: existingLangUnit?.name || lang.name,
-        number: existingLangUnit?.number || `0${idx + 1}`,
-        description: existingLangUnit?.description || `${lang.name} language curriculum & coursework`,
-        status: existingLangUnit?.status || "In Progress",
-        children
-      };
-    });
-
-    const extraCustomUnits = existingUnits
-      .filter(u => !matchedUnitIds.has(u.id))
-      .map((u, idx) => ({
-        id: u.id,
-        name: u.name,
-        number: u.number || `0${mappedDefaults.length + idx + 1}`,
-        description: u.description || `${u.name} course materials`,
-        status: u.status || "In Progress",
-        children: u.children || []
-      }));
-
-    return [...mappedDefaults, ...extraCustomUnits];
-  }, [subject, isLang2Subject]);
-
-  // Master resolver for current effective units
-  const getEffectiveUnits = (): Unit[] => {
-    if (isLang2Subject) {
-      return lang2Options.map(l => ({
-        id: l.id,
-        name: l.name,
-        number: l.number,
-        description: l.description,
-        status: l.status,
-        masteryPercent: 0,
-        materials: [],
-        children: l.children
-      }));
-    }
-    if (subject.units && subject.units.length > 0) {
-      return subject.units;
-    }
-    if (isLang1Subject) {
-      const defaultTb: Unit = {
-        id: `${subject.id}_tb`,
-        number: "00",
-        name: "Textbook",
-        description: `${subject.name} Prescribed Reference Textbook`,
-        masteryPercent: 0,
-        status: "In Progress",
-        kind: "textbook"
-      };
-      return [defaultTb, ...displayUnits];
-    }
-    return displayUnits;
-  };
-
   // Unit Card Creator / Editor Modal State
   const [isAddUnitModalOpen, setIsAddUnitModalOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
-  const [targetParentUnitId, setTargetParentUnitId] = useState<string | null>(null);
-  const [targetParentUnitName, setTargetParentUnitName] = useState<string>("");
+  const [targetParentLangId, setTargetParentLangId] = useState<string | null>(null);
   const [newUnitNumber, setNewUnitNumber] = useState("");
   const [newUnitName, setNewUnitName] = useState("");
   const [newUnitDesc, setNewUnitDesc] = useState("");
   const [newUnitTopics, setNewUnitTopics] = useState("");
 
-  const handleOpenAddUnitModal = (parentUnitId?: string, parentUnitName?: string) => {
+  // Helper functions for recursive unit tree traversal
+  const findUnitInTree = (units: Unit[], unitId: string): Unit | undefined => {
+    for (const u of units) {
+      if (u.id === unitId) return u;
+      if (u.children && u.children.length > 0) {
+        const found = findUnitInTree(u.children, unitId);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+
+  const removeUnitFromTree = (units: Unit[], unitIdToDelete: string): Unit[] => {
+    return units
+      .filter(u => u.id !== unitIdToDelete)
+      .map(u => {
+        if (u.children && u.children.length > 0) {
+          return {
+            ...u,
+            children: removeUnitFromTree(u.children, unitIdToDelete)
+          };
+        }
+        return u;
+      });
+  };
+
+  const updateUnitInTree = (units: Unit[], unitId: string, updateFn: (u: Unit) => Unit): Unit[] => {
+    return units.map(u => {
+      if (u.id === unitId) {
+        return updateFn(u);
+      }
+      if (u.children && u.children.length > 0) {
+        return {
+          ...u,
+          children: updateUnitInTree(u.children, unitId, updateFn)
+        };
+      }
+      return u;
+    });
+  };
+
+  const removeMaterialFromTree = (units: Unit[], materialId: string, targetUnitId?: string): Unit[] => {
+    return units.map(u => {
+      let newMaterials = u.materials || [];
+      if (!targetUnitId || u.id === targetUnitId) {
+        newMaterials = newMaterials.filter(m => m.id !== materialId);
+      }
+      let newChildren = u.children;
+      if (u.children && u.children.length > 0) {
+        newChildren = removeMaterialFromTree(u.children, materialId, targetUnitId);
+      }
+      return {
+        ...u,
+        materials: newMaterials,
+        ...(newChildren ? { children: newChildren } : {})
+      };
+    });
+  };
+
+  const addMaterialToUnitInTree = (units: Unit[], unitId: string, newMaterial: StudyMaterial): Unit[] => {
+    return units.map(u => {
+      if (u.id === unitId) {
+        return {
+          ...u,
+          materials: [...(u.materials || []), newMaterial]
+        };
+      }
+      if (u.children && u.children.length > 0) {
+        return {
+          ...u,
+          children: addMaterialToUnitInTree(u.children, unitId, newMaterial)
+        };
+      }
+      return u;
+    });
+  };
+
+  const findMaterialInTree = (subjectObj: Subject, units: Unit[], materialId: string): { material: StudyMaterial; parentUnitId?: string } | undefined => {
+    const tb = (subjectObj.textbooks || []).find(m => m.id === materialId);
+    if (tb) return { material: tb, parentUnitId: "textbook" };
+
+    const sm = (subjectObj.materials || []).find(m => m.id === materialId);
+    if (sm) return { material: sm };
+
+    const searchUnits = (list: Unit[]): { material: StudyMaterial; parentUnitId?: string } | undefined => {
+      for (const u of list) {
+        const mat = (u.materials || []).find(m => m.id === materialId);
+        if (mat) return { material: mat, parentUnitId: u.id };
+        if (u.children && u.children.length > 0) {
+          const found = searchUnits(u.children);
+          if (found) return found;
+        }
+      }
+      return undefined;
+    };
+
+    return searchUnits(units);
+  };
+
+  const getBaseUnitsForOperations = (): Unit[] => {
+    if (subject.units && subject.units.length > 0) {
+      // If Lang 2, ensure language units and their children are present
+      if (isLang2Subject) {
+        const hasNestedChildren = subject.units.some(u => u.children && u.children.length > 0);
+        if (!hasNestedChildren && lang2Options.length > 0) {
+          return lang2Options.map(lo => ({
+            id: lo.id,
+            number: lo.number,
+            name: lo.name,
+            description: lo.description,
+            status: lo.status as any,
+            masteryPercent: 0,
+            children: lo.children
+          }));
+        }
+      }
+      return [...subject.units];
+    }
+    if (isLang2Subject && lang2Options.length > 0) {
+      return lang2Options.map(lo => ({
+        id: lo.id,
+        number: lo.number,
+        name: lo.name,
+        description: lo.description,
+        status: lo.status as any,
+        masteryPercent: 0,
+        children: lo.children
+      }));
+    }
+    return [...displayUnits];
+  };
+
+  const handleOpenAddUnitModal = (parentLangId?: string, parentLangName?: string) => {
     if (!isAdmin) {
       alert("Only administrators can add unit cards.");
       return;
     }
     setEditingUnit(null);
+    setTargetParentLangId(parentLangId || null);
 
-    let resolvedParentId = parentUnitId || null;
-    let resolvedParentName = parentUnitName || "";
+    const count = parentLangId
+      ? (lang2Options.find(lo => lo.id === parentLangId)?.children.length || 0)
+      : displayUnits.length;
 
-    if (isLang2Subject && !resolvedParentId) {
-      if (expandedLangId) {
-        resolvedParentId = expandedLangId;
-        const pOpt = lang2Options.find(l => l.id === expandedLangId);
-        resolvedParentName = pOpt?.name || "";
-      } else if (lang2Options.length > 0) {
-        resolvedParentId = lang2Options[0].id;
-        resolvedParentName = lang2Options[0].name;
-      }
-    }
-
-    setTargetParentUnitId(resolvedParentId);
-    setTargetParentUnitName(resolvedParentName);
-    
-    if (resolvedParentId && isLang2Subject) {
-      const parentOption = lang2Options.find(l => l.id === resolvedParentId);
-      const childCount = parentOption?.children ? parentOption.children.length : 0;
-      setNewUnitNumber(`0${childCount}`);
-      setNewUnitName(`Chapter ${childCount}: `);
-    } else {
-      const nextNum = (displayUnits.length + 1).toString().padStart(2, "0");
-      setNewUnitNumber(nextNum);
-      setNewUnitName(`Unit ${displayUnits.length + 1}: `);
-    }
+    const nextNum = (count + 1).toString().padStart(2, "0");
+    setNewUnitNumber(nextNum);
+    setNewUnitName(parentLangName ? `${parentLangName} Chapter ${count + 1}` : `Unit ${count + 1}: `);
     setNewUnitDesc("");
     setNewUnitTopics("");
     setIsAddUnitModalOpen(true);
@@ -382,14 +279,13 @@ export default function SubjectHub({
 
   const handleOpenEditUnitModal = (unitToEdit: Unit) => {
     if (!isAdmin) {
-      alert("Only administrators can edit unit cards. Unlock admin mode in the top navigation or settings.");
+      alert("Only administrators can edit unit cards.");
       return;
     }
     setEditingUnit(unitToEdit);
-    setTargetParentUnitId(null);
-    setTargetParentUnitName("");
+    setTargetParentLangId(null);
     setNewUnitNumber(unitToEdit.number || "01");
-    setNewUnitName(unitToEdit.name || "");
+    setNewUnitName(unitToEdit.name);
     setNewUnitDesc(unitToEdit.description || "");
     setNewUnitTopics(unitToEdit.topics ? unitToEdit.topics.join(", ") : "");
     setIsAddUnitModalOpen(true);
@@ -401,7 +297,7 @@ export default function SubjectHub({
       return;
     }
     if (!newUnitName.trim()) {
-      alert("Please enter a card name!");
+      alert("Please enter a Unit Name!");
       return;
     }
 
@@ -410,88 +306,43 @@ export default function SubjectHub({
       .map(t => t.trim())
       .filter(Boolean);
 
-    const baseUnits = getEffectiveUnits();
+    const baseUnits = getBaseUnitsForOperations();
     let updatedUnits: Unit[] = [];
 
     if (editingUnit) {
-      // Edit existing unit anywhere in the hierarchy (top-level language or nested chapter card)
-      let found = false;
-      const modifyUnitRecursively = (unitsList: Unit[]): Unit[] => {
-        return unitsList.map(u => {
-          if (u.id === editingUnit.id || (editingUnit.id && u.id.endsWith(editingUnit.id)) || (u.name === editingUnit.name && u.number === editingUnit.number)) {
-            found = true;
-            return {
-              ...u,
-              number: newUnitNumber.trim() || u.number,
-              name: newUnitName.trim(),
-              description: newUnitDesc.trim() || u.description,
-              topics: topicsArray.length > 0 ? topicsArray : u.topics
-            };
-          }
-          if (u.children && u.children.length > 0) {
-            return {
-              ...u,
-              children: modifyUnitRecursively(u.children)
-            };
-          }
-          return u;
-        });
-      };
-
-      updatedUnits = modifyUnitRecursively(baseUnits);
-
-      if (!found) {
-        // Direct recursive fallback using updateUnitsList
-        updatedUnits = updateUnitsList(baseUnits, editingUnit.id, u => ({
-          ...u,
-          number: newUnitNumber.trim() || u.number,
-          name: newUnitName.trim(),
-          description: newUnitDesc.trim() || u.description,
-          topics: topicsArray.length > 0 ? topicsArray : u.topics
-        }));
-      }
+      // Edit existing unit anywhere in tree
+      updatedUnits = updateUnitInTree(baseUnits, editingUnit.id, u => ({
+        ...u,
+        number: newUnitNumber.trim() || u.number,
+        name: newUnitName.trim(),
+        description: newUnitDesc.trim() || u.description,
+        topics: topicsArray.length > 0 ? topicsArray : u.topics
+      }));
     } else {
-      // Add new unit / chapter card
+      // Add new unit
       const newUnitCard: Unit = {
         id: `unit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        number: newUnitNumber.trim() || "01",
+        number: newUnitNumber.trim() || `0${baseUnits.length + 1}`,
         name: newUnitName.trim(),
         description: newUnitDesc.trim() || `Comprehensive syllabus materials for ${newUnitName.trim()}`,
         masteryPercent: 0,
         status: "In Progress",
-        kind: isLang2Subject ? "chapter" : "unit",
         topics: topicsArray,
         materials: [],
         importantQuestions: [],
         youtubeLinks: []
       };
 
-      if (targetParentUnitId) {
-        // Add as a child inside the selected language option
-        updatedUnits = baseUnits.map(p => {
-          if (p.id === targetParentUnitId) {
+      if (isLang2Subject && targetParentLangId) {
+        updatedUnits = baseUnits.map(u => {
+          if (u.id === targetParentLangId) {
             return {
-              ...p,
-              children: [...(p.children || []), newUnitCard]
+              ...u,
+              children: [...(u.children || []), newUnitCard]
             };
           }
-          return p;
+          return u;
         });
-      } else if (isLang2Subject) {
-        const targetId = expandedLangId || (lang2Options[0]?.id);
-        if (targetId) {
-          updatedUnits = baseUnits.map(p => {
-            if (p.id === targetId) {
-              return {
-                ...p,
-                children: [...(p.children || []), newUnitCard]
-              };
-            }
-            return p;
-          });
-        } else {
-          updatedUnits = [...baseUnits, newUnitCard];
-        }
       } else {
         updatedUnits = [...baseUnits, newUnitCard];
       }
@@ -500,17 +351,14 @@ export default function SubjectHub({
     const updatedSubject: Subject = {
       ...subject,
       units: updatedUnits,
-      modulesCount: isLang2Subject 
-        ? updatedUnits.reduce((acc, u) => acc + (u.children?.length || 1), 0)
-        : updatedUnits.length
+      modulesCount: updatedUnits.length
     };
 
     onUpdateSubject(updatedSubject);
     setIsAddUnitModalOpen(false);
     setEditingUnit(null);
-    setTargetParentUnitId(null);
-    setTargetParentUnitName("");
-    alert(editingUnit ? `Card "${newUnitName.trim()}" successfully updated! 🥕` : `New Card "${newUnitName.trim()}" added and synchronized across devices! 🥕`);
+    setTargetParentLangId(null);
+    alert(editingUnit ? `Unit "${newUnitName.trim()}" successfully updated! 🥕` : `New Unit Card "${newUnitName.trim()}" added and synchronized across devices! 🥕`);
   };
 
   const handleDeleteUnitCard = (unitToDelete: Unit) => {
@@ -520,44 +368,20 @@ export default function SubjectHub({
     }
     if (!window.confirm(`Are you sure you want to delete "${unitToDelete.name}"? This action cannot be undone.`)) return;
 
-    const baseUnits = getEffectiveUnits();
-    const updatedUnits = deleteFromUnitsList(baseUnits, unitToDelete.id);
+    const baseUnits = getBaseUnitsForOperations();
+    const updatedUnits = removeUnitFromTree(baseUnits, unitToDelete.id);
 
     const updatedSubject: Subject = {
       ...subject,
       units: updatedUnits,
-      modulesCount: isLang2Subject 
-        ? updatedUnits.reduce((acc, u) => acc + (u.children?.length || 1), 0)
-        : updatedUnits.length
+      modulesCount: updatedUnits.length
     };
 
     onUpdateSubject(updatedSubject);
-  };
-
-  const handleToggleUnitStatus = (unitId: string) => {
-    const baseUnits = getEffectiveUnits();
-    const updatedUnits = updateUnitsList(baseUnits, unitId, unit => {
-      const nextStatus: "Locked" | "In Progress" | "Mastered" = 
-        unit.status === "Mastered" ? "In Progress" : unit.status === "In Progress" ? "Locked" : "Mastered";
-      const nextPercent = nextStatus === "Mastered" ? 100 : nextStatus === "In Progress" ? 50 : 0;
-      return { ...unit, status: nextStatus, masteryPercent: nextPercent };
-    });
-
-    const completed = updatedUnits.reduce((count, u) => {
-      if (u.children && u.children.length > 0) {
-        return count + u.children.filter(c => c.status === "Mastered").length;
-      }
-      return count + (u.status === "Mastered" ? 1 : 0);
-    }, 0);
-
-    const total = updatedUnits.reduce((count, u) => count + (u.children ? u.children.length : 1), 0);
-
-    onUpdateSubject({
-      ...subject,
-      units: updatedUnits,
-      completedModules: completed,
-      progressPercent: Math.round((completed / Math.max(1, total)) * 100)
-    });
+    if (selectedUnit?.id === unitToDelete.id) {
+      setSelectedUnit(null);
+    }
+    alert(`Unit card "${unitToDelete.name}" was deleted successfully! 🥕`);
   };
 
   // Material Blob Resolution State
@@ -987,38 +811,30 @@ export default function SubjectHub({
       alert("Only an authenticated admin can delete study materials.");
       return;
     }
-    if (!window.confirm("Are you sure you want to delete this file/note from this unit?")) return;
-    
-    const baseUnits = getEffectiveUnits();
-    let targetMat: StudyMaterial | undefined;
-    const findMatInTree = (units: Unit[]) => {
-      for (const u of units) {
-        const found = u.materials?.find(m => m.id === materialId);
-        if (found) {
-          targetMat = found;
-          return;
-        }
-        if (u.children) findMatInTree(u.children);
-      }
-    };
-    findMatInTree(baseUnits);
-    
-    const delRes = await deleteMaterialFromSupabase(materialId, targetMat?.cloudPath);
-    if (!delRes.success) {
-      alert(`Deletion Failed: ${delRes.message}`);
-      return;
+    if (!window.confirm("Are you sure you want to delete this file/note?")) return;
+
+    const baseUnits = getBaseUnitsForOperations();
+    const targetInfo = findMaterialInTree(subject, baseUnits, materialId);
+    const targetCloudPath = targetInfo?.material?.cloudPath;
+
+    // Attempt deletion from Supabase Storage & DB
+    try {
+      await deleteMaterialFromSupabase(materialId, targetCloudPath);
+    } catch (delErr) {
+      console.warn("[SUPABASE DELETE NON-BLOCKING WARN]", delErr);
     }
 
-    const updatedUnits = updateUnitsList(baseUnits, unitId, unit => ({
-      ...unit,
-      materials: (unit.materials || []).filter(m => m.id !== materialId)
-    }));
-
-    onUpdateSubject({
+    // Recursively clean material from all units, children, subject.materials and subject.textbooks
+    const updatedUnits = removeMaterialFromTree(baseUnits, materialId, unitId);
+    const updatedSubject: Subject = {
       ...subject,
-      units: updatedUnits
-    });
-    alert("Study material deleted successfully from Supabase Storage and Database! 🥕");
+      units: updatedUnits,
+      materials: (subject.materials || []).filter(m => m.id !== materialId),
+      textbooks: (subject.textbooks || []).filter(m => m.id !== materialId)
+    };
+
+    await onUpdateSubject(updatedSubject);
+    alert("Study material deleted successfully! 🥕");
   };
 
   const handleDeleteSubjectMaterial = async (materialId: string) => {
@@ -1027,19 +843,26 @@ export default function SubjectHub({
       return;
     }
     if (!window.confirm("Are you sure you want to delete this file/note from this subject?")) return;
-    const targetMat = subject.materials?.find(m => m.id === materialId);
+    const baseUnits = getBaseUnitsForOperations();
+    const targetInfo = findMaterialInTree(subject, baseUnits, materialId);
+    const targetCloudPath = targetInfo?.material?.cloudPath;
     
-    const delRes = await deleteMaterialFromSupabase(materialId, targetMat?.cloudPath);
-    if (!delRes.success) {
-      alert(`Deletion Failed: ${delRes.message}`);
-      return;
+    try {
+      await deleteMaterialFromSupabase(materialId, targetCloudPath);
+    } catch (delErr) {
+      console.warn("[SUPABASE DELETE NON-BLOCKING WARN]", delErr);
     }
 
-    onUpdateSubject({
+    const updatedUnits = removeMaterialFromTree(baseUnits, materialId);
+    const updatedSubject: Subject = {
       ...subject,
-      materials: (subject.materials || []).filter(m => m.id !== materialId)
-    });
-    alert("Study material deleted successfully from Supabase Storage and Database! 🥕");
+      units: updatedUnits,
+      materials: (subject.materials || []).filter(m => m.id !== materialId),
+      textbooks: (subject.textbooks || []).filter(m => m.id !== materialId)
+    };
+
+    await onUpdateSubject(updatedSubject);
+    alert("Study material deleted successfully! 🥕");
   };
 
   const handleDeleteSubjectTextbook = async (materialId: string) => {
@@ -1048,17 +871,25 @@ export default function SubjectHub({
       return;
     }
     if (!window.confirm("Are you sure you want to delete this textbook?")) return;
-    const targetMat = (subject.textbooks || []).find(m => m.id === materialId);
+    const baseUnits = getBaseUnitsForOperations();
+    const targetInfo = findMaterialInTree(subject, baseUnits, materialId);
+    const targetCloudPath = targetInfo?.material?.cloudPath;
     
-    if (targetMat) {
-      await deleteMaterialFromSupabase(materialId, targetMat.cloudPath);
+    try {
+      await deleteMaterialFromSupabase(materialId, targetCloudPath);
+    } catch (delErr) {
+      console.warn("[SUPABASE DELETE NON-BLOCKING WARN]", delErr);
     }
 
-    onUpdateSubject({
+    const updatedUnits = removeMaterialFromTree(baseUnits, materialId);
+    const updatedSubject: Subject = {
       ...subject,
+      units: updatedUnits,
       textbooks: (subject.textbooks || []).filter(m => m.id !== materialId),
       materials: (subject.materials || []).filter(m => m.id !== materialId)
-    });
+    };
+
+    await onUpdateSubject(updatedSubject);
     alert("Textbook deleted successfully! 🥕");
   };
 
@@ -1074,8 +905,9 @@ export default function SubjectHub({
       url: ytUrl.trim(),
       channelName: "Academic Lecture Video"
     };
-    const baseUnits = getEffectiveUnits();
-    const updatedUnits = updateUnitsList(baseUnits, unitId, u => ({
+
+    const baseUnits = getBaseUnitsForOperations();
+    const updatedUnits = updateUnitInTree(baseUnits, unitId, u => ({
       ...u,
       youtubeLinks: [...(u.youtubeLinks || []), newYt]
     }));
@@ -1085,8 +917,8 @@ export default function SubjectHub({
   };
 
   const handleDeleteYoutubeLink = (unitId: string, ytId: string) => {
-    const baseUnits = getEffectiveUnits();
-    const updatedUnits = updateUnitsList(baseUnits, unitId, u => ({
+    const baseUnits = getBaseUnitsForOperations();
+    const updatedUnits = updateUnitInTree(baseUnits, unitId, u => ({
       ...u,
       youtubeLinks: (u.youtubeLinks || []).filter(y => y.id !== ytId)
     }));
@@ -1106,8 +938,9 @@ export default function SubjectHub({
       importance: qImportance,
       yearTag: "High Yield Exam Topic"
     };
-    const baseUnits = getEffectiveUnits();
-    const updatedUnits = updateUnitsList(baseUnits, unitId, u => ({
+
+    const baseUnits = getBaseUnitsForOperations();
+    const updatedUnits = updateUnitInTree(baseUnits, unitId, u => ({
       ...u,
       importantQuestions: [...(u.importantQuestions || []), newQ]
     }));
@@ -1117,8 +950,8 @@ export default function SubjectHub({
   };
 
   const handleDeleteImportantQuestion = (unitId: string, qId: string) => {
-    const baseUnits = getEffectiveUnits();
-    const updatedUnits = updateUnitsList(baseUnits, unitId, u => ({
+    const baseUnits = getBaseUnitsForOperations();
+    const updatedUnits = updateUnitInTree(baseUnits, unitId, u => ({
       ...u,
       importantQuestions: (u.importantQuestions || []).filter(q => q.id !== qId)
     }));
@@ -1132,41 +965,68 @@ export default function SubjectHub({
       const fetched = await fetchMaterialsFromSupabaseDB(subject.id);
       if (!isMounted || fetched.length === 0) return;
 
-      let hasNewMaterials = false;
-      const updatedUnits = subject.units.map(unit => {
-        const unitFetched = fetched.filter(f => f.unitId === unit.id);
-        if (unitFetched.length === 0) return unit;
+      const baseUnits = getBaseUnitsForOperations();
 
-        const existingIds = new Set((unit.materials || []).map(m => m.id));
-        const newUnitMats: StudyMaterial[] = unitFetched
-          .filter(f => !existingIds.has(f.id))
-          .map(f => ({
-            id: f.id,
-            name: f.name,
-            size: f.size,
-            addedTime: "Uploaded by Admin",
-            type: f.type,
-            isBookmarked: false,
-            tag: "Unit File",
-            details: f.publicUrl,
-            cloudPath: f.cloudPath,
-            publicUrl: f.publicUrl,
-            uploadedAt: f.uploadedAt,
-            courseId: f.courseId,
-            semesterId: f.semesterId,
-            subjectId: f.subjectId,
-            unitId: f.unitId
-          }));
+      const syncUnitMaterialsRecursively = (units: Unit[]): { updated: Unit[]; hasChanges: boolean } => {
+        let changed = false;
+        const newUnits = units.map(unit => {
+          const unitFetched = fetched.filter(f => f.unitId === unit.id);
+          let newUnitMats: StudyMaterial[] = [];
+          if (unitFetched.length > 0) {
+            const existingIds = new Set((unit.materials || []).map(m => m.id));
+            newUnitMats = unitFetched
+              .filter(f => !existingIds.has(f.id))
+              .map(f => ({
+                id: f.id,
+                name: f.name,
+                size: f.size,
+                addedTime: "Uploaded by Admin",
+                type: f.type,
+                isBookmarked: false,
+                tag: "Unit File",
+                details: f.publicUrl,
+                cloudPath: f.cloudPath,
+                publicUrl: f.publicUrl,
+                uploadedAt: f.uploadedAt,
+                courseId: f.courseId,
+                semesterId: f.semesterId,
+                subjectId: f.subjectId,
+                unitId: f.unitId
+              }));
+          }
 
-        if (newUnitMats.length > 0) {
-          hasNewMaterials = true;
-          return {
-            ...unit,
-            materials: [...(unit.materials || []), ...newUnitMats]
-          };
-        }
-        return unit;
-      });
+          let updatedChildren = unit.children;
+          if (unit.children && unit.children.length > 0) {
+            const childResult = syncUnitMaterialsRecursively(unit.children);
+            if (childResult.hasChanges) {
+              changed = true;
+              updatedChildren = childResult.updated;
+            }
+          }
+
+          if (newUnitMats.length > 0) {
+            changed = true;
+            return {
+              ...unit,
+              materials: [...(unit.materials || []), ...newUnitMats],
+              ...(updatedChildren ? { children: updatedChildren } : {})
+            };
+          }
+
+          if (updatedChildren !== unit.children) {
+            return {
+              ...unit,
+              children: updatedChildren
+            };
+          }
+
+          return unit;
+        });
+
+        return { updated: newUnits, hasChanges: changed };
+      };
+
+      const { updated: updatedUnits, hasChanges: unitChanges } = syncUnitMaterialsRecursively(baseUnits);
 
       const subjectGeneralFetched = fetched.filter(f => f.unitId === "subject_general" || !f.unitId);
       const existingSubMatIds = new Set((subject.materials || []).map(m => m.id));
@@ -1190,9 +1050,7 @@ export default function SubjectHub({
           unitId: f.unitId
         }));
 
-      if (newSubMats.length > 0) {
-        hasNewMaterials = true;
-      }
+      let hasNewMaterials = unitChanges || newSubMats.length > 0;
 
       if (hasNewMaterials) {
         onUpdateSubject({
@@ -1289,6 +1147,7 @@ export default function SubjectHub({
         unitId: cloudRes.unitId
       };
 
+      const baseUnits = getBaseUnitsForOperations();
       let updatedSubjectObj: Subject;
 
       if (targetUnitId === "textbook") {
@@ -1298,11 +1157,7 @@ export default function SubjectHub({
           materials: [...(subject.materials || []), newMaterial]
         };
       } else if (targetUnitId) {
-        const baseUnits = getEffectiveUnits();
-        const updatedUnits = updateUnitsList(baseUnits, targetUnitId, unit => ({
-          ...unit,
-          materials: [...(unit.materials || []), newMaterial]
-        }));
+        const updatedUnits = addMaterialToUnitInTree(baseUnits, targetUnitId, newMaterial);
         updatedSubjectObj = {
           ...subject,
           units: updatedUnits
@@ -1375,13 +1230,10 @@ export default function SubjectHub({
       details: adminNoteContent
     };
 
-    const baseUnits = getEffectiveUnits();
+    const baseUnits = getBaseUnitsForOperations();
     const updatedSubjectObj: Subject = targetUnitId ? {
       ...subject,
-      units: updateUnitsList(baseUnits, targetUnitId, unit => ({
-        ...unit,
-        materials: [...(unit.materials || []), newMaterial]
-      }))
+      units: addMaterialToUnitInTree(baseUnits, targetUnitId, newMaterial)
     } : {
       ...subject,
       materials: [...(subject.materials || []), newMaterial]
@@ -1462,6 +1314,171 @@ export default function SubjectHub({
     }
   };
 
+  // Determine subject classification
+  const isLabSubject = useMemo(() => {
+    return (
+      subject.isLab ||
+      subject.contentMode === "labs" ||
+      subject.name.toLowerCase().includes("lab") ||
+      subject.id.includes("lab")
+    );
+  }, [subject]);
+
+  const isLang1Subject = useMemo(() => {
+    return (
+      subject.contentMode === "chapters" ||
+      subject.name.toLowerCase().includes("language i") ||
+      subject.name.toLowerCase() === "language 1" ||
+      subject.id.startsWith("language_1") ||
+      subject.id.includes("lang1")
+    );
+  }, [subject]);
+
+  const isLang2Subject = useMemo(() => {
+    return (
+      subject.contentMode === "languages" ||
+      subject.name.toLowerCase().includes("language ii") ||
+      subject.name.toLowerCase() === "language 2" ||
+      subject.id.startsWith("language_2") ||
+      subject.id.includes("lang2")
+    );
+  }, [subject]);
+
+  // Language II expandable options state
+  const [expandedLangId, setExpandedLangId] = useState<string>("");
+
+  useEffect(() => {
+    if (isLang2Subject) {
+      setExpandedLangId(subject.units[0]?.id || `${subject.id}_kan`);
+    }
+  }, [subject.id, isLang2Subject]);
+
+  // Recursive updater for top-level and nested units
+  function updateUnitsList(units: Unit[], targetId: string, updateFn: (u: Unit) => Unit): Unit[] {
+    return units.map(unit => {
+      if (unit.id === targetId) {
+        return updateFn(unit);
+      }
+      if (unit.children && unit.children.length > 0) {
+        return {
+          ...unit,
+          children: updateUnitsList(unit.children, targetId, updateFn)
+        };
+      }
+      return unit;
+    });
+  }
+
+  // Display Units computation for Labs, Language I, and standard theory subjects
+  const displayUnits = useMemo(() => {
+    if (isLabSubject) {
+      if (subject.units && subject.units.length > 0) {
+        return subject.units;
+      }
+      const requiredLabSections = [
+        { name: "Manual", desc: "Comprehensive Laboratory Manual, experiment procedures, and theoretical instructions." },
+        { name: "Outputs", desc: "Sample code outputs, practical execution screenshots, and terminal results." },
+        { name: "Viva Questions", desc: "Essential viva voce questions, practical exam interview Q&A, and lab quizzes." }
+      ];
+
+      return requiredLabSections.map((sec, idx) => ({
+        id: `${subject.id}_lab_${idx + 1}`,
+        number: `0${idx + 1}`,
+        name: sec.name,
+        description: `${subject.name} - ${sec.desc}`,
+        masteryPercent: 0,
+        status: "In Progress" as const,
+        materials: [],
+        importantQuestions: [],
+        youtubeLinks: []
+      }));
+    }
+
+    if (isLang1Subject) {
+      // Filter out textbook unit (which is displayed separately in the Prescribed Reference section)
+      const nonTextbookUnits = (subject.units || []).filter(
+        u => u.kind !== "textbook" && !u.name.toLowerCase().includes("textbook")
+      );
+
+      // If units exist in subject.units, return ALL of them, preserving custom titles and newly added cards!
+      if (nonTextbookUnits.length > 0) {
+        return nonTextbookUnits;
+      }
+
+      // Default fallback if subject.units is empty
+      const chapterNames = ["Chapter 1", "Chapter 2", "Chapter 3", "Chapter 4"];
+      return chapterNames.map((chName, idx) => ({
+        id: `${subject.id}_ch_${idx + 1}`,
+        number: `0${idx + 1}`,
+        name: chName,
+        description: `${subject.name} - ${chName} Study Material & Notes`,
+        masteryPercent: 0,
+        status: "In Progress" as const,
+        materials: [],
+        importantQuestions: [],
+        youtubeLinks: []
+      }));
+    }
+
+    return (subject.units || []).filter(u => !u.name.toLowerCase().includes("textbook") && u.kind !== "textbook");
+  }, [subject, isLabSubject, isLang1Subject]);
+
+  // Language II Options computation: Kannada, Hindi, Additional English
+  const lang2Options = useMemo(() => {
+    if (!isLang2Subject) return [];
+
+    const defaultLangs = [
+      { id: `${subject.id}_kan`, name: "Kannada", code: "kan" },
+      { id: `${subject.id}_hin`, name: "Hindi", code: "hin" },
+      { id: `${subject.id}_ae`, name: "Additional English", code: "ae" }
+    ];
+
+    return defaultLangs.map((lang, idx) => {
+      const existingLangUnit = (subject.units || []).find(u => 
+        u.name.toLowerCase().includes(lang.name.toLowerCase()) || u.id.includes(lang.code)
+      );
+
+      const defaultChildren: Unit[] = [
+        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Textbook`, masteryPercent: 0, status: "In Progress", materials: subject.textbooks || [] },
+        { id: `${subject.id}_${lang.code}_ch1`, number: "01", name: "Chapter 1", description: `${lang.name} Chapter 1 Study Material`, masteryPercent: 0, status: "In Progress" },
+        { id: `${subject.id}_${lang.code}_ch2`, number: "02", name: "Chapter 2", description: `${lang.name} Chapter 2 Study Material`, masteryPercent: 0, status: "In Progress" },
+        { id: `${subject.id}_${lang.code}_ch3`, number: "03", name: "Chapter 3", description: `${lang.name} Chapter 3 Study Material`, masteryPercent: 0, status: "In Progress" },
+        { id: `${subject.id}_${lang.code}_ch4`, number: "04", name: "Chapter 4", description: `${lang.name} Chapter 4 Study Material`, masteryPercent: 0, status: "In Progress" }
+      ];
+
+      const children = existingLangUnit && Array.isArray(existingLangUnit.children)
+        ? existingLangUnit.children
+        : defaultChildren;
+
+      return {
+        id: existingLangUnit?.id || `${subject.id}_${lang.code}`,
+        name: existingLangUnit?.name || lang.name,
+        number: existingLangUnit?.number || `0${idx + 1}`,
+        description: existingLangUnit?.description || `${lang.name} language curriculum & coursework`,
+        status: existingLangUnit?.status || "In Progress",
+        children
+      };
+    });
+  }, [subject, isLang2Subject]);
+
+  const handleToggleUnitStatus = (unitId: string) => {
+    const updatedUnits = updateUnitsList(subject.units, unitId, unit => {
+      const nextStatus: "Locked" | "In Progress" | "Mastered" = 
+        unit.status === "Mastered" ? "In Progress" : unit.status === "In Progress" ? "Locked" : "Mastered";
+      const nextPercent = nextStatus === "Mastered" ? 100 : nextStatus === "In Progress" ? 50 : 0;
+      return { ...unit, status: nextStatus, masteryPercent: nextPercent };
+    });
+
+    const completed = updatedUnits.filter(u => u.status === "Mastered").length;
+
+    onUpdateSubject({
+      ...subject,
+      units: updatedUnits,
+      completedModules: completed,
+      progressPercent: Math.round((completed / Math.max(1, updatedUnits.length)) * 100)
+    });
+  };
+
   const renderUnitCard = (unit: Unit) => {
     const isMastered = unit.status === "Mastered";
     const isInProgress = unit.status === "In Progress";
@@ -1475,17 +1492,17 @@ export default function SubjectHub({
           isSelected ? "border-[#A67C52] ring-1 ring-[#A67C52]/20 shadow-sm" : "border-[#D8C4AC]"
         }`}
       >
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-[#8B6B52] bg-[#F3ECE5] px-2.5 py-1 rounded-lg">
+        <div className="flex justify-between items-center mb-4 gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <span className="text-xs font-bold text-[#8B6B52] bg-[#F3ECE5] px-2.5 py-1 rounded-lg shrink-0">
               {unit.number}
             </span>
-            <h4 className="font-bold text-sm text-[#561C24]">
+            <h4 className="font-bold text-sm text-[#561C24] truncate whitespace-nowrap overflow-hidden text-ellipsis" title={unit.name}>
               {unit.name}
             </h4>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={(e) => {
@@ -1562,35 +1579,52 @@ export default function SubjectHub({
                 No PDF files attached to {unit.name} yet. Use the upload box below to attach PDF files.
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {unit.materials.map((m) => {
                   return (
                     <div 
                       key={m.id}
-                      className="p-3 bg-[#fff8f3]/90 hover:bg-[#ffebd6] rounded-xl border border-[#dac1c1]/30 flex flex-wrap justify-between items-center transition-all gap-2 group/file"
+                      className="p-3.5 bg-[#fff8f3]/90 hover:bg-[#ffebd6] rounded-xl border border-[#dac1c1]/30 flex flex-col transition-all gap-2.5 group/file shadow-xs"
                     >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {/* Top Row: Icon + File Name in One Line + Details */}
+                      <div className="flex items-center gap-3 min-w-0 w-full">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-red-100 text-red-600">
-                          <FileText size={15} />
+                          <FileText size={16} />
                         </div>
-                        <div className="text-left min-w-0">
-                          <h5 className="font-bold text-xs text-[#40010d] truncate group-hover/file:text-[#95491a]">
+                        <div className="text-left min-w-0 flex-1">
+                          <h5 
+                            className="font-bold text-xs sm:text-sm text-[#40010d] group-hover/file:text-[#95491a] truncate whitespace-nowrap overflow-hidden text-ellipsis" 
+                            title={m.name}
+                          >
                             {m.name}
                           </h5>
-                          <p className="text-[10px] text-gray-500 mt-0.5">
-                            {m.size} • PDF Document
+                          <p className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1.5 truncate">
+                            <span className="font-semibold">{m.size || "PDF Document"}</span>
+                            <span>•</span>
+                            <span className="uppercase font-bold text-[#95491a]">PDF Document</span>
                           </p>
                         </div>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUnitMaterial(unit.id, m.id)}
+                            className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all cursor-pointer shrink-0"
+                            title="Delete File"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Bottom Row: View and Download buttons below */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-[#dac1c1]/25 w-full">
                         <button 
                           type="button"
                           onClick={() => openMaterial(m)}
-                          className="px-2.5 py-1.5 bg-[#40010d] hover:bg-[#7a2c35] text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                          title="View document inside app"
+                          className="flex-1 px-3 py-1.5 bg-[#40010d] hover:bg-[#7a2c35] text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-95"
+                          title={`View ${m.name} inside app`}
                         >
-                          <Eye size={12} />
+                          <Eye size={13} />
                           <span>View</span>
                         </button>
 
@@ -1601,11 +1635,11 @@ export default function SubjectHub({
                               type="button"
                               onClick={() => handleDownloadFile(m)}
                               disabled={status === "downloading"}
-                              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50 ${
+                              className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-95 disabled:opacity-50 ${
                                 status === "completed"
-                                  ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300"
+                                  ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 font-extrabold"
                                   : status === "error"
-                                  ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300"
+                                  ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300 font-extrabold"
                                   : "bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white"
                               }`}
                               title={status === "completed" ? "✓ Downloaded! Click to re-download" : status === "error" ? "Download failed. Click to retry" : "Download file directly to device"}
@@ -1617,17 +1651,17 @@ export default function SubjectHub({
                                 </>
                               ) : status === "completed" ? (
                                 <>
-                                  <FileCheck size={12} className="text-emerald-700" />
+                                  <FileCheck size={13} className="text-emerald-700" />
                                   <span>✓ Downloaded</span>
                                 </>
                               ) : status === "error" ? (
                                 <>
-                                  <Download size={12} className="text-red-700" />
+                                  <Download size={13} className="text-red-700" />
                                   <span>Retry</span>
                                 </>
                               ) : (
                                 <>
-                                  <Download size={12} />
+                                  <Download size={13} />
                                   <span>Download</span>
                                 </>
                               )}
@@ -1640,21 +1674,11 @@ export default function SubjectHub({
                             type="button"
                             onClick={() => handleManualSaveToWeb(m.name)}
                             disabled={isSavingWeb}
-                            className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                            className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                            title="Save to Web Storage"
                           >
-                            <Save size={12} />
+                            <Save size={13} />
                             <span>Save</span>
-                          </button>
-                        )}
-
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteUnitMaterial(unit.id, m.id)}
-                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
-                            title="Delete File"
-                          >
-                            <Trash2 size={13} />
                           </button>
                         )}
                       </div>
@@ -1797,9 +1821,10 @@ export default function SubjectHub({
                     return (
                       <div 
                         key={m.id}
-                        className="p-3 bg-[#fff8f3]/90 hover:bg-[#ffebd6] rounded-xl border border-[#dac1c1]/30 flex flex-wrap justify-between items-center transition-all gap-2 group/file"
+                        className="p-3.5 bg-[#fff8f3]/90 hover:bg-[#ffebd6] rounded-xl border border-[#dac1c1]/30 flex flex-col transition-all gap-2.5 group/file shadow-xs"
                       >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {/* Top Row: Icon + File Name in One Line + Details */}
+                        <div className="flex items-center gap-3 min-w-0 w-full">
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                             isPdf ? "bg-red-100 text-red-600" :
                             isPpt ? "bg-orange-100 text-orange-600" :
@@ -1807,30 +1832,52 @@ export default function SubjectHub({
                             isDoc ? "bg-emerald-100 text-emerald-600" :
                             isCode ? "bg-blue-100 text-blue-600" : "bg-amber-100 text-amber-700"
                           }`}>
-                            {isPdf ? <FileText size={15} /> :
-                             isPpt ? <Presentation size={15} /> :
-                             isImg ? <ImageIcon size={15} /> :
-                             isDoc ? <FileText size={15} /> :
-                             isCode ? <Terminal size={15} /> : <BookOpen size={15} />}
+                            {isPdf ? <FileText size={16} /> :
+                             isPpt ? <Presentation size={16} /> :
+                             isImg ? <ImageIcon size={16} /> :
+                             isDoc ? <FileText size={16} /> :
+                             isCode ? <Terminal size={16} /> : <BookOpen size={16} />}
                           </div>
-                          <div className="text-left min-w-0">
-                            <h5 className="font-bold text-xs text-[#40010d] truncate group-hover/file:text-[#95491a]">
+                          <div className="text-left min-w-0 flex-1">
+                            <h5 
+                              className="font-bold text-xs sm:text-sm text-[#40010d] group-hover/file:text-[#95491a] truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                              title={m.name}
+                            >
                               {m.name}
                             </h5>
-                            <p className="text-[10px] text-gray-500 mt-0.5">
-                              {m.size} • {m.type.toUpperCase()} file
+                            <p className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1.5 truncate">
+                              <span className="font-semibold">{m.size || "PDF Document"}</span>
+                              <span>•</span>
+                              <span className="uppercase font-bold text-[#95491a]">{m.type || "PDF"} file</span>
+                              {m.tag && (
+                                <>
+                                  <span>•</span>
+                                  <span className="bg-[#FAF3E0] text-[#95491a] px-1.5 py-0.2 rounded border border-[#D8C4AC]/40 shrink-0">{m.tag}</span>
+                                </>
+                              )}
                             </p>
                           </div>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUnitMaterial(unit.id, m.id)}
+                              className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all cursor-pointer shrink-0"
+                              title="Delete File"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Bottom Row: View and Download buttons below */}
+                        <div className="flex items-center gap-2 pt-2 border-t border-[#dac1c1]/25 w-full">
                           <button 
                             type="button"
                             onClick={() => openMaterial(m)}
-                            className="px-2.5 py-1.5 bg-[#40010d] hover:bg-[#7a2c35] text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                            title="View document inside app"
+                            className="flex-1 px-3 py-1.5 bg-[#40010d] hover:bg-[#7a2c35] text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-95"
+                            title={`View ${m.name} inside app`}
                           >
-                            <Eye size={12} />
+                            <Eye size={13} />
                             <span>View</span>
                           </button>
 
@@ -1841,11 +1888,11 @@ export default function SubjectHub({
                                 type="button"
                                 onClick={() => handleDownloadFile(m)}
                                 disabled={status === "downloading"}
-                                className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50 ${
+                                className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-95 disabled:opacity-50 ${
                                   status === "completed"
-                                    ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300"
+                                    ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 font-extrabold"
                                     : status === "error"
-                                    ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300"
+                                    ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300 font-extrabold"
                                     : "bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white"
                                 }`}
                                 title={status === "completed" ? "✓ Downloaded! Click to re-download" : status === "error" ? "Download failed. Click to retry" : "Download file directly to device"}
@@ -1857,17 +1904,17 @@ export default function SubjectHub({
                                   </>
                                 ) : status === "completed" ? (
                                   <>
-                                    <FileCheck size={12} className="text-emerald-700" />
+                                    <FileCheck size={13} className="text-emerald-700" />
                                     <span>✓ Downloaded</span>
                                   </>
                                 ) : status === "error" ? (
                                   <>
-                                    <Download size={12} className="text-red-700" />
+                                    <Download size={13} className="text-red-700" />
                                     <span>Retry</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Download size={12} />
+                                    <Download size={13} />
                                     <span>Download</span>
                                   </>
                                 )}
@@ -1880,21 +1927,11 @@ export default function SubjectHub({
                               type="button"
                               onClick={() => handleManualSaveToWeb(m.name)}
                               disabled={isSavingWeb}
-                              className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                              className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                              title="Save to Web Storage"
                             >
-                              <Save size={12} />
+                              <Save size={13} />
                               <span>Save</span>
-                            </button>
-                          )}
-
-                          {isAdmin && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteUnitMaterial(unit.id, m.id)}
-                              className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
-                              title="Delete File"
-                            >
-                              <Trash2 size={13} />
                             </button>
                           )}
                         </div>
@@ -2390,30 +2427,47 @@ export default function SubjectHub({
                     {(subject.textbooks || []).map((book) => (
                       <div
                         key={book.id}
-                        className="p-3 bg-[#F8F4EF] hover:bg-[#EEE4DA] rounded-xl border border-[#D8C4AC] flex flex-wrap justify-between items-center transition-all gap-2 group/tb"
+                        className="p-3.5 bg-[#F8F4EF] hover:bg-[#EEE4DA] rounded-xl border border-[#D8C4AC] flex flex-col transition-all gap-2.5 group/tb shadow-xs"
                       >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {/* Top Row: Icon + Book Name in One Line + Details */}
+                        <div className="flex items-center gap-3 min-w-0 w-full">
                           <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-[#561C24] text-white">
-                            <BookOpen size={15} />
+                            <BookOpen size={16} />
                           </div>
-                          <div className="text-left min-w-0">
-                            <h5 className="font-bold text-xs text-[#561C24] truncate">
+                          <div className="text-left min-w-0 flex-1">
+                            <h5 
+                              className="font-bold text-xs sm:text-sm text-[#561C24] truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                              title={book.name}
+                            >
                               {book.name}
                             </h5>
-                            <p className="text-[10px] text-[#8B6B52] mt-0.5">
-                              {book.size || "PDF Textbook"} • Prescribed Material
+                            <p className="text-[10px] text-[#8B6B52] mt-0.5 flex items-center gap-1.5 truncate">
+                              <span className="font-semibold">{book.size || "PDF Textbook"}</span>
+                              <span>•</span>
+                              <span className="uppercase font-bold text-[#A67C52]">Prescribed Material</span>
                             </p>
                           </div>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSubjectTextbook(book.id)}
+                              className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all cursor-pointer shrink-0"
+                              title="Delete Textbook"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Bottom Row: View and Download buttons below */}
+                        <div className="flex items-center gap-2 pt-2 border-t border-[#D8C4AC]/40 w-full">
                           <button
                             type="button"
                             onClick={() => openMaterial(book)}
-                            className="px-2.5 py-1.5 bg-[#561C24] hover:bg-[#6D2932] text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                            title="View textbook document"
+                            className="flex-1 px-3 py-1.5 bg-[#561C24] hover:bg-[#6D2932] text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-95"
+                            title={`View ${book.name}`}
                           >
-                            <Eye size={12} />
+                            <Eye size={13} />
                             <span>View</span>
                           </button>
 
@@ -2424,11 +2478,11 @@ export default function SubjectHub({
                                 type="button"
                                 onClick={() => handleDownloadFile(book)}
                                 disabled={status === "downloading"}
-                                className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50 ${
+                                className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-95 disabled:opacity-50 ${
                                   status === "completed"
-                                    ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300"
+                                    ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 font-extrabold"
                                     : status === "error"
-                                    ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300"
+                                    ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300 font-extrabold"
                                     : "bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white"
                                 }`}
                                 title={status === "completed" ? "✓ Downloaded! Click to re-download" : status === "error" ? "Download failed. Click to retry" : "Download file directly to device"}
@@ -2440,17 +2494,17 @@ export default function SubjectHub({
                                   </>
                                 ) : status === "completed" ? (
                                   <>
-                                    <FileCheck size={12} className="text-emerald-700" />
+                                    <FileCheck size={13} className="text-emerald-700" />
                                     <span>✓ Downloaded</span>
                                   </>
                                 ) : status === "error" ? (
                                   <>
-                                    <Download size={12} className="text-red-700" />
+                                    <Download size={13} className="text-red-700" />
                                     <span>Retry</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Download size={12} />
+                                    <Download size={13} />
                                     <span>Download</span>
                                   </>
                                 )}
@@ -2463,21 +2517,11 @@ export default function SubjectHub({
                               type="button"
                               onClick={() => handleManualSaveToWeb(book.name)}
                               disabled={isSavingWeb}
-                              className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                              className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                              title="Save to Web Storage"
                             >
-                              <Save size={12} />
+                              <Save size={13} />
                               <span>Save</span>
-                            </button>
-                          )}
-
-                          {isAdmin && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteSubjectTextbook(book.id)}
-                              className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
-                              title="Delete Textbook"
-                            >
-                              <Trash2 size={13} />
                             </button>
                           )}
                         </div>
@@ -2569,13 +2613,13 @@ export default function SubjectHub({
                     return (
                       <div key={langOption.id} className="bg-white rounded-3xl border border-[#D8C4AC] overflow-hidden shadow-xs transition-all">
                         {/* Accordion Header for Language Option */}
-                        <div className="w-full p-5 flex items-center justify-between gap-4 text-left hover:bg-[#F8F4EF] transition-colors">
-                          <button
-                            type="button"
-                            onClick={() => setExpandedLangId(isExpanded ? "" : langOption.id)}
-                            className="flex items-center gap-3 flex-1 text-left cursor-pointer"
-                          >
-                            <div className="w-10 h-10 rounded-2xl bg-[#561C24] text-white flex items-center justify-center font-bold text-sm shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedLangId(isExpanded ? "" : langOption.id)}
+                          className="w-full p-5 flex items-center justify-between gap-4 text-left hover:bg-[#F8F4EF] transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-[#561C24] text-white flex items-center justify-center font-bold text-sm">
                               {langOption.number}
                             </div>
                             <div>
@@ -2583,66 +2627,43 @@ export default function SubjectHub({
                                 {langOption.name}
                               </h3>
                               <p className="text-xs text-[#8B6B52]">
-                                {langOption.description || `Includes Textbook and Chapters (${langOption.children?.length || 0} items)`}
+                                Includes Textbook and Chapters 1 - 4
                               </p>
                             </div>
-                          </button>
+                          </div>
 
-                          <div className="flex items-center gap-2.5">
-                            {isAdmin && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenEditUnitModal(langOption);
-                                }}
-                                className="p-2 text-gray-400 hover:text-[#95491a] hover:bg-[#f8e6cb] rounded-xl transition-colors cursor-pointer"
-                                title={`Edit ${langOption.name} Option Details`}
-                              >
-                                <Pencil size={15} />
-                              </button>
-                            )}
-                            <span 
-                              onClick={() => setExpandedLangId(isExpanded ? "" : langOption.id)}
-                              className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#F3ECE5] text-[#561C24] cursor-pointer"
-                            >
+                          <div className="flex items-center gap-3">
+                            <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#F3ECE5] text-[#561C24]">
                               {langOption.children.length} Course Items
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => setExpandedLangId(isExpanded ? "" : langOption.id)}
-                              className="p-1 text-[#A67C52] cursor-pointer"
-                            >
-                              <ChevronDown size={20} className={`transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`} />
-                            </button>
+                            <ChevronDown size={20} className={`text-[#A67C52] transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`} />
                           </div>
-                        </div>
+                        </button>
 
-                        {/* Accordion Content: Textbook + Chapters */}
+                        {/* Accordion Content: Textbook + Chapters 1-4 */}
                         <AnimatePresence>
                           {isExpanded && (
                             <motion.div
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: "auto", opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
-                              className="border-t border-[#D8C4AC]/60 p-5 bg-[#FDFBF7] space-y-4"
+                              className="border-t border-[#D8C4AC]/60 p-5 bg-[#FDFBF7]"
                             >
-                              {isAdmin && (
-                                <div className="flex justify-between items-center bg-[#F3ECE5] p-3 rounded-2xl border border-[#D8C4AC]">
-                                  <span className="text-xs font-extrabold text-[#561C24]">
-                                    📚 {langOption.name} Course Sections ({langOption.children.length})
-                                  </span>
+                              <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+                                <span className="text-xs font-bold text-[#561C24]">
+                                  {langOption.name} Curriculum Modules ({langOption.children.length})
+                                </span>
+                                {isAdmin && (
                                   <button
                                     type="button"
                                     onClick={() => handleOpenAddUnitModal(langOption.id, langOption.name)}
-                                    className="px-3.5 py-1.5 bg-[#561C24] hover:bg-[#3D141A] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                                    className="bg-[#95491a] hover:bg-[#7a2c35] text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs active:scale-95 cursor-pointer"
                                   >
-                                    <Plus size={14} />
-                                    <span>Add Chapter to {langOption.name}</span>
+                                    <PlusCircle size={14} />
+                                    <span>Add Card / Chapter</span>
                                   </button>
-                                </div>
-                              )}
-
+                                )}
+                              </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {langOption.children.map((childUnit) => renderUnitCard(childUnit))}
                               </div>
@@ -2806,9 +2827,10 @@ export default function SubjectHub({
                               return (
                                 <div 
                                   key={m.id}
-                                  className="p-3 bg-[#fff8f3]/90 hover:bg-[#ffebd6] rounded-xl border border-[#dac1c1]/30 flex flex-wrap justify-between items-center transition-all gap-2 group/file"
+                                  className="p-3.5 bg-[#fff8f3]/90 hover:bg-[#ffebd6] rounded-xl border border-[#dac1c1]/30 flex flex-col transition-all gap-2.5 group/file shadow-xs"
                                 >
-                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  {/* Top Row: Icon + File Name in One Line + Details */}
+                                  <div className="flex items-center gap-3 min-w-0 w-full">
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                                       isPdf ? "bg-red-100 text-red-600" :
                                       isPpt ? "bg-orange-100 text-orange-600" :
@@ -2816,32 +2838,47 @@ export default function SubjectHub({
                                       isDoc ? "bg-emerald-100 text-emerald-600" :
                                       isCode ? "bg-blue-100 text-blue-600" : "bg-amber-100 text-amber-700"
                                     }`}>
-                                      {isPdf ? <FileText size={15} /> :
-                                       isPpt ? <Presentation size={15} /> :
-                                       isImg ? <ImageIcon size={15} /> :
-                                       isDoc ? <FileText size={15} /> :
-                                       isCode ? <Terminal size={15} /> : <BookOpen size={15} />}
+                                      {isPdf ? <FileText size={16} /> :
+                                       isPpt ? <Presentation size={16} /> :
+                                       isImg ? <ImageIcon size={16} /> :
+                                       isDoc ? <FileText size={16} /> :
+                                       isCode ? <Terminal size={16} /> : <BookOpen size={16} />}
                                     </div>
-                                    <div className="text-left min-w-0">
-                                      <h5 className="font-bold text-xs text-[#40010d] truncate group-hover/file:text-[#95491a]">
+                                    <div className="text-left min-w-0 flex-1">
+                                      <h5 
+                                        className="font-bold text-xs sm:text-sm text-[#40010d] group-hover/file:text-[#95491a] truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                                        title={m.name}
+                                      >
                                         {m.name}
                                       </h5>
-                                      <p className="text-[10px] text-gray-500 mt-0.5">
-                                        {m.size} • {m.type.toUpperCase()} file
+                                      <p className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1.5 truncate">
+                                        <span className="font-semibold">{m.size || "PDF Document"}</span>
+                                        <span>•</span>
+                                        <span className="uppercase font-bold text-[#95491a]">{m.type || "PDF"} file</span>
                                       </p>
                                     </div>
-                                   </div>
+                                    {isAdmin && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteUnitMaterial(unit.id, m.id)}
+                                        className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all cursor-pointer shrink-0"
+                                        title="Delete File"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    )}
+                                  </div>
 
-                                   {/* Side-by-Side View Document, Download & Save to Cloud Buttons */}
-                                  <div className="flex items-center gap-1.5 shrink-0">
+                                  {/* Bottom Row: View and Download buttons below */}
+                                  <div className="flex items-center gap-2 pt-2 border-t border-[#dac1c1]/25 w-full">
                                     <button 
                                       type="button"
                                       onClick={() => openMaterial(m)}
-                                      className="px-2.5 py-1.5 bg-[#40010d] hover:bg-[#7a2c35] text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95"
-                                      title="View document inside app"
+                                      className="flex-1 px-3 py-1.5 bg-[#40010d] hover:bg-[#7a2c35] text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-95"
+                                      title={`View ${m.name} inside app`}
                                     >
-                                      <Eye size={12} />
-                                      <span>View Document</span>
+                                      <Eye size={13} />
+                                      <span>View</span>
                                     </button>
 
                                     {(() => {
@@ -2851,11 +2888,11 @@ export default function SubjectHub({
                                           type="button"
                                           onClick={() => handleDownloadFile(m)}
                                           disabled={status === "downloading"}
-                                          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50 ${
+                                          className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-95 disabled:opacity-50 ${
                                             status === "completed"
-                                              ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300"
+                                              ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 font-extrabold"
                                               : status === "error"
-                                              ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300"
+                                              ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300 font-extrabold"
                                               : "bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white"
                                           }`}
                                           title={status === "completed" ? "✓ Downloaded! Click to re-download" : status === "error" ? "Download failed. Click to retry" : "Download file directly to device"}
@@ -2867,17 +2904,17 @@ export default function SubjectHub({
                                             </>
                                           ) : status === "completed" ? (
                                             <>
-                                              <FileCheck size={12} className="text-emerald-700" />
+                                              <FileCheck size={13} className="text-emerald-700" />
                                               <span>✓ Downloaded</span>
                                             </>
                                           ) : status === "error" ? (
                                             <>
-                                              <Download size={12} className="text-red-700" />
+                                              <Download size={13} className="text-red-700" />
                                               <span>Retry</span>
                                             </>
                                           ) : (
                                             <>
-                                              <Download size={12} />
+                                              <Download size={13} />
                                               <span>Download</span>
                                             </>
                                           )}
@@ -2890,22 +2927,11 @@ export default function SubjectHub({
                                         type="button"
                                         onClick={() => handleManualSaveToWeb(m.name)}
                                         disabled={isSavingWeb}
-                                        className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                                        className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
                                         title="Ensure file is permanently saved to Web Cloud"
                                       >
-                                        <Save size={12} />
+                                        <Save size={13} />
                                         <span>Save</span>
-                                      </button>
-                                    )}
-
-                                    {isAdmin && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteUnitMaterial(unit.id, m.id)}
-                                        className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
-                                        title="Delete File"
-                                      >
-                                        <Trash2 size={13} />
                                       </button>
                                     )}
                                   </div>
@@ -3484,29 +3510,57 @@ export default function SubjectHub({
                     <div
                       key={material.id}
                       onClick={() => openMaterial(material)}
-                      className="p-5 bg-white rounded-3xl border border-[#dac1c1]/20 shadow-xs hover:shadow-md transition-all cursor-pointer flex justify-between items-center"
+                      className="p-4 sm:p-5 bg-white rounded-2xl sm:rounded-3xl border border-[#dac1c1]/30 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col gap-3 group"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+                      {/* Top Row: Icon + File Name in One Line + Details */}
+                      <div className="flex items-center gap-3.5 min-w-0 w-full">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                           isPdf ? "bg-red-50 text-red-600" : isCode ? "bg-blue-50 text-blue-600" : "bg-yellow-50 text-yellow-700"
                         }`}>
                           {isPdf ? <FileText size={20} /> : isCode ? <Terminal size={20} /> : <HelpCircle size={20} />}
                         </div>
-                        <div>
-                          <h4 className="font-bold text-xs text-[#40010d] line-clamp-1">{material.name}</h4>
-                          <span className="text-[10px] text-[#877272] font-semibold mt-1 block">
-                            {material.size} • {material.addedTime}
+                        <div className="min-w-0 flex-1 text-left">
+                          <h4 
+                            className="font-bold text-xs sm:text-sm text-[#40010d] group-hover:text-[#95491a] truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                            title={material.name}
+                          >
+                            {material.name}
+                          </h4>
+                          <span className="text-[10px] text-[#877272] font-semibold mt-0.5 block flex items-center gap-1.5 truncate">
+                            <span>{material.size}</span>
+                            <span>•</span>
+                            <span>{material.addedTime || "Added recently"}</span>
+                            {material.tag && (
+                              <>
+                                <span>•</span>
+                                <span className="bg-[#FAF3E0] text-[#95491a] px-1.5 py-0.2 rounded border border-[#D8C4AC]/40 shrink-0">{material.tag}</span>
+                              </>
+                            )}
                           </span>
                         </div>
+                        {isAdmin && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSubjectMaterial(material.id);
+                            }}
+                            className="p-2 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-xl transition-all cursor-pointer shrink-0"
+                            title="Delete File Permanently"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                       
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      {/* Bottom Row: View and Download buttons below */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-[#dac1c1]/20 w-full" onClick={(e) => e.stopPropagation()}>
                         <button 
                           onClick={() => openMaterial(material)}
-                          className="px-3 py-1.5 bg-[#f8e6cb]/50 hover:bg-[#fd9b65] text-[#95491a] hover:text-[#341100] rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                          className="flex-1 px-3 py-2 bg-[#f8e6cb]/70 hover:bg-[#fd9b65] text-[#95491a] hover:text-[#341100] rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 shadow-xs"
+                          title={`View ${material.name}`}
                         >
-                          <Eye size={12} />
-                          {isPdf ? "View PDF" : isCode ? "View Code" : "View Notes"}
+                          <Eye size={13} />
+                          <span>{isPdf ? "View PDF" : isCode ? "View Code" : "View Notes"}</span>
                         </button>
 
                         {(() => {
@@ -3516,7 +3570,7 @@ export default function SubjectHub({
                               type="button"
                               onClick={() => handleDownloadFile(material)}
                               disabled={status === "downloading"}
-                              className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs disabled:opacity-50 ${
+                              className={`flex-1 px-3 py-2 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-95 disabled:opacity-50 ${
                                 status === "completed"
                                   ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 font-extrabold"
                                   : status === "error"
@@ -3532,32 +3586,23 @@ export default function SubjectHub({
                                 </>
                               ) : status === "completed" ? (
                                 <>
-                                  <FileCheck size={12} className="text-emerald-700" />
+                                  <FileCheck size={13} className="text-emerald-700" />
                                   <span>✓ Downloaded</span>
                                 </>
                               ) : status === "error" ? (
                                 <>
-                                  <Download size={12} className="text-red-700" />
+                                  <Download size={13} className="text-red-700" />
                                   <span>Retry</span>
                                 </>
                               ) : (
                                 <>
-                                  <Download size={12} />
+                                  <Download size={13} />
                                   <span>Download</span>
                                 </>
                               )}
                             </button>
                           );
                         })()}
-                        {isAdmin && (
-                          <button
-                            onClick={() => handleDeleteSubjectMaterial(material.id)}
-                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
-                            title="Delete File Permanently"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        )}
                       </div>
                     </div>
                   );
@@ -4091,9 +4136,7 @@ export default function SubjectHub({
             >
               <div className="flex justify-between items-center border-b border-[#dac1c1]/30 pb-4 mb-5">
                 <h3 className="font-sans text-lg font-extrabold text-[#40010d] flex items-center gap-2">
-                  {editingUnit 
-                    ? `Edit ${isLang2Subject || editingUnit.kind === "chapter" ? "Chapter" : "Unit"}: ${editingUnit.name}` 
-                    : `Add New ${isLang2Subject || targetParentUnitId ? "Chapter Card" : "Unit Card"}`} <Sparkles size={18} className="text-[#fd9b65]" />
+                  {editingUnit ? "Edit Unit Card" : "Add New Unit Card"} <Sparkles size={18} className="text-[#fd9b65]" />
                 </h3>
                 <button
                   type="button"
@@ -4108,11 +4151,11 @@ export default function SubjectHub({
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-1">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-[#544243] mb-1.5">
-                      {isLang2Subject || editingUnit?.kind === "chapter" ? "Chapter / Section #" : "Unit Number"}
+                      Unit Number
                     </label>
                     <input
                       type="text"
-                      placeholder={isLang2Subject ? "01" : "05"}
+                      placeholder="e.g. 05"
                       value={newUnitNumber}
                       onChange={(e) => setNewUnitNumber(e.target.value)}
                       className="w-full bg-white border border-[#dac1c1] px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[#fd9b65]"
@@ -4122,11 +4165,11 @@ export default function SubjectHub({
 
                   <div className="col-span-2">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-[#544243] mb-1.5">
-                      {isLang2Subject || editingUnit?.kind === "chapter" ? "Chapter / Section Name *" : "Unit Name *"}
+                      Unit Name *
                     </label>
                     <input
                       type="text"
-                      placeholder={isLang2Subject ? "e.g. Chapter 1: Poetry & Prose" : "e.g. Unit 5: Distributed Systems"}
+                      placeholder="e.g. Unit 5: Distributed Systems"
                       value={newUnitName}
                       onChange={(e) => setNewUnitName(e.target.value)}
                       className="w-full bg-white border border-[#dac1c1] px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[#fd9b65]"
@@ -4137,10 +4180,10 @@ export default function SubjectHub({
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-[#544243] mb-1.5">
-                    {isLang2Subject || editingUnit?.kind === "chapter" ? "Chapter Description" : "Unit Description"}
+                    Unit Description
                   </label>
                   <textarea
-                    placeholder={isLang2Subject ? "Summary of this chapter or language module..." : "Brief overview of concepts covered in this unit..."}
+                    placeholder="Brief overview of concepts covered in this unit..."
                     value={newUnitDesc}
                     onChange={(e) => setNewUnitDesc(e.target.value)}
                     rows={3}
@@ -4154,7 +4197,7 @@ export default function SubjectHub({
                   </label>
                   <input
                     type="text"
-                    placeholder={isLang2Subject ? "e.g. Grammar, Comprehension, Literary Elements" : "e.g. Microservices, Consensus Algorithms, Fault Tolerance"}
+                    placeholder="e.g. Microservices, Consensus Algorithms, Fault Tolerance"
                     value={newUnitTopics}
                     onChange={(e) => setNewUnitTopics(e.target.value)}
                     className="w-full bg-white border border-[#dac1c1] px-3 py-2.5 rounded-xl text-xs focus:outline-none focus:border-[#fd9b65]"
@@ -4174,7 +4217,7 @@ export default function SubjectHub({
                     className="px-5 py-2.5 bg-[#95491a] hover:bg-[#7a2c35] text-white font-bold text-xs rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-1.5"
                   >
                     <Save size={14} />
-                    <span>{editingUnit ? "Save Changes" : isLang2Subject ? "Add Chapter Card" : "Create Unit Card"}</span>
+                    <span>{editingUnit ? "Save Changes" : "Create Unit Card"}</span>
                   </button>
                 </div>
               </form>
