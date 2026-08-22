@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc, getDocFromServer, onSnapshot } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { uploadFileToSupabaseStorage } from "./supabase";
 import config from "../../firebase-applet-config.json";
 
 // Initialize Firebase App
@@ -120,8 +121,6 @@ export async function uploadFileToCloud(
   onProgress?: (percent: number, statusMsg: string) => void,
   contextParams?: { courseId?: string; semesterId?: string; subjectId?: string; unitId?: string }
 ): Promise<{ url: string; name: string; size: string; type: string; cloudPath: string; publicUrl: string }> {
-  const { uploadFileToSupabaseStorage } = await import("./supabase");
-  
   try {
     const res = await uploadFileToSupabaseStorage(file, contextParams, onProgress);
     
@@ -159,7 +158,6 @@ let lastSavedCoursesPayload = "";
  */
 async function testFirestoreConnection() {
   try {
-    const { getDocFromServer } = await import("firebase/firestore");
     await getDocFromServer(doc(db, "courses", "main"));
     logDiagnostic("success", "[Firestore Boot] Verified active connection to Firestore cloud!");
   } catch (error) {
@@ -335,6 +333,44 @@ export function subscribeNotificationsFromFirestore(callback: (notifications: an
     return unsubscribe;
   } catch (err: any) {
     console.warn("[Firestore Notification Subscription Fail]", err);
+    return () => {};
+  }
+}
+
+export function saveFeedbackToFirestore(feedbackList: any[]): Promise<boolean> {
+  logDiagnostic("info", `Saving ${feedbackList.length} feedback items to Firestore 'feedback/main'...`);
+  try {
+    const fbDocRef = doc(db, "feedback", "main");
+    setDoc(fbDocRef, {
+      feedback: feedbackList,
+      updatedAt: new Date().toISOString()
+    });
+    logDiagnostic("success", "[Firestore Feedback] Saved student feedback to Firestore cloud!");
+    return Promise.resolve(true);
+  } catch (err: any) {
+    logDiagnostic("warn", `[Firestore Feedback Write Fail] ${err?.message || err}`);
+    return Promise.resolve(false);
+  }
+}
+
+export function subscribeFeedbackFromFirestore(callback: (feedback: any[]) => void): () => void {
+  logDiagnostic("info", "Attaching real-time listener to Firestore 'feedback/main'...");
+  try {
+    const fbDocRef = doc(db, "feedback", "main");
+    const unsubscribe = onSnapshot(fbDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && Array.isArray(data.feedback)) {
+          logDiagnostic("success", `[Firestore Realtime Feedback] Received ${data.feedback.length} student feedback entries!`);
+          callback(data.feedback);
+        }
+      }
+    }, (err) => {
+      console.warn("[Firestore Feedback Listener Warn]", err);
+    });
+    return unsubscribe;
+  } catch (err: any) {
+    console.warn("[Firestore Feedback Subscription Fail]", err);
     return () => {};
   }
 }

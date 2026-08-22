@@ -98,6 +98,40 @@ export default function SubjectHub({
   const [qAnswer, setQAnswer] = useState("");
   const [qImportance, setQImportance] = useState<"High" | "Medium" | "Low">("High");
   const [openQuestionId, setOpenQuestionId] = useState<string | null>(null);
+  const [showManualQuestionForm, setShowManualQuestionForm] = useState<Record<string, boolean>>({});
+
+  // Helper to extract question PDFs from unit materials and importantQuestionsPdfs
+  const getUnitQuestionPdfs = (unit: Unit): StudyMaterial[] => {
+    const list: StudyMaterial[] = [];
+    const seenIds = new Set<string>();
+
+    (unit.importantQuestionsPdfs || []).forEach(m => {
+      if (!seenIds.has(m.id)) {
+        seenIds.add(m.id);
+        list.push(m);
+      }
+    });
+
+    (unit.materials || []).forEach(m => {
+      const isQ =
+        m.tag === "Important Questions" ||
+        m.tag === "Question Bank" ||
+        m.tag === "Question Paper" ||
+        m.type === "question" ||
+        m.name.toLowerCase().includes("question") ||
+        m.name.toLowerCase().includes("qb") ||
+        m.name.toLowerCase().includes("imp q") ||
+        m.name.toLowerCase().includes("imp question") ||
+        m.name.toLowerCase().includes("model paper");
+
+      if (isQ && !seenIds.has(m.id)) {
+        seenIds.add(m.id);
+        list.push(m);
+      }
+    });
+
+    return list;
+  };
 
   // In-App YouTube Video Player state
   const [activeYtVideo, setActiveYtVideo] = useState<{ id: string; title: string; url: string; ytId: string | null; channelName?: string; unitNumber?: string } | null>(null);
@@ -169,8 +203,10 @@ export default function SubjectHub({
   const removeMaterialFromTree = (units: Unit[], materialId: string, targetUnitId?: string): Unit[] => {
     return units.map(u => {
       let newMaterials = u.materials || [];
+      let newQPdfs = u.importantQuestionsPdfs || [];
       if (!targetUnitId || u.id === targetUnitId) {
         newMaterials = newMaterials.filter(m => m.id !== materialId);
+        newQPdfs = newQPdfs.filter(m => m.id !== materialId);
       }
       let newChildren = u.children;
       if (u.children && u.children.length > 0) {
@@ -179,23 +215,26 @@ export default function SubjectHub({
       return {
         ...u,
         materials: newMaterials,
+        importantQuestionsPdfs: newQPdfs,
         ...(newChildren ? { children: newChildren } : {})
       };
     });
   };
 
-  const addMaterialToUnitInTree = (units: Unit[], unitId: string, newMaterial: StudyMaterial): Unit[] => {
+  const addMaterialToUnitInTree = (units: Unit[], unitId: string, newMaterial: StudyMaterial, isQuestionPdf?: boolean): Unit[] => {
     return units.map(u => {
       if (u.id === unitId) {
+        const isQ = isQuestionPdf || newMaterial.tag === "Important Questions" || newMaterial.type === "question";
         return {
           ...u,
-          materials: [...(u.materials || []), newMaterial]
+          materials: [...(u.materials || []), newMaterial],
+          ...(isQ ? { importantQuestionsPdfs: [...(u.importantQuestionsPdfs || []), newMaterial] } : {})
         };
       }
       if (u.children && u.children.length > 0) {
         return {
           ...u,
-          children: addMaterialToUnitInTree(u.children, unitId, newMaterial)
+          children: addMaterialToUnitInTree(u.children, unitId, newMaterial, isQuestionPdf)
         };
       }
       return u;
@@ -958,6 +997,22 @@ export default function SubjectHub({
     onUpdateSubject({ ...subject, units: updatedUnits });
   };
 
+  const handleDeleteQuestionPdf = (unitId: string, materialId: string) => {
+    if (!isAdmin) {
+      alert("Only administrator account can delete files.");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete this Important Questions PDF?")) return;
+    const baseUnits = getBaseUnitsForOperations();
+    const updatedUnits = removeMaterialFromTree(baseUnits, materialId, unitId);
+    const updatedSubject: Subject = {
+      ...subject,
+      units: updatedUnits
+    };
+    onUpdateSubject(updatedSubject);
+    alert("Important Questions PDF deleted successfully!");
+  };
+
   // Automatically fetch study materials stored in Supabase PostgreSQL table 'study_materials'
   useEffect(() => {
     let isMounted = true;
@@ -1065,7 +1120,7 @@ export default function SubjectHub({
     return () => { isMounted = false; };
   }, [subject.id]);
 
-  const handleProcessFile = async (file: File, targetUnitId: string | null) => {
+  const handleProcessFile = async (file: File, targetUnitId: string | null, customTag?: string) => {
     if (!isAdmin) {
       alert("Only administrator account can upload files or notes.");
       return;
@@ -1129,6 +1184,7 @@ export default function SubjectHub({
         logDiagnostic("warn", `[SUPABASE DB INSERT NON-BLOCKING] Storage upload succeeded, database metadata skipped.`);
       }
 
+      const isQuestionUpload = customTag === "Important Questions";
       const newMaterial: StudyMaterial = {
         id: cloudRes.id,
         name: cloudRes.name,
@@ -1136,7 +1192,7 @@ export default function SubjectHub({
         addedTime: "Uploaded by Admin",
         type: cloudRes.type,
         isBookmarked: false,
-        tag: targetUnitId === "textbook" ? "Prescribed Textbook" : targetUnitId ? "Unit File" : "Subject File",
+        tag: customTag || (targetUnitId === "textbook" ? "Prescribed Textbook" : targetUnitId ? "Unit File" : "Subject File"),
         details: cloudRes.publicUrl,
         cloudPath: cloudRes.cloudPath,
         publicUrl: cloudRes.publicUrl,
@@ -1157,7 +1213,7 @@ export default function SubjectHub({
           materials: [...(subject.materials || []), newMaterial]
         };
       } else if (targetUnitId) {
-        const updatedUnits = addMaterialToUnitInTree(baseUnits, targetUnitId, newMaterial);
+        const updatedUnits = addMaterialToUnitInTree(baseUnits, targetUnitId, newMaterial, isQuestionUpload);
         updatedSubjectObj = {
           ...subject,
           units: updatedUnits
@@ -1439,16 +1495,49 @@ export default function SubjectHub({
       );
 
       const defaultChildren: Unit[] = [
-        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Textbook`, masteryPercent: 0, status: "In Progress", materials: subject.textbooks || [] },
-        { id: `${subject.id}_${lang.code}_ch1`, number: "01", name: "Chapter 1", description: `${lang.name} Chapter 1 Study Material`, masteryPercent: 0, status: "In Progress" },
-        { id: `${subject.id}_${lang.code}_ch2`, number: "02", name: "Chapter 2", description: `${lang.name} Chapter 2 Study Material`, masteryPercent: 0, status: "In Progress" },
-        { id: `${subject.id}_${lang.code}_ch3`, number: "03", name: "Chapter 3", description: `${lang.name} Chapter 3 Study Material`, masteryPercent: 0, status: "In Progress" },
-        { id: `${subject.id}_${lang.code}_ch4`, number: "04", name: "Chapter 4", description: `${lang.name} Chapter 4 Study Material`, masteryPercent: 0, status: "In Progress" }
+        { id: `${subject.id}_${lang.code}_tb`, number: "00", name: "Textbook", description: `${lang.name} Prescribed Reference Textbook`, masteryPercent: 0, status: "In Progress", materials: subject.textbooks || [], kind: "textbook" },
+        { id: `${subject.id}_${lang.code}_poems`, number: "01", name: "Poems", description: `${lang.name} Prescribed Poems & Literary Verses`, masteryPercent: 0, status: "In Progress", kind: "chapter" },
+        { id: `${subject.id}_${lang.code}_lessons`, number: "02", name: "Lessons", description: `${lang.name} Prescribed Lessons & Prose`, masteryPercent: 0, status: "In Progress", kind: "chapter" },
+        { id: `${subject.id}_${lang.code}_essays`, number: "03", name: "Essays", description: `${lang.name} Prescribed Essays & Composition`, masteryPercent: 0, status: "In Progress", kind: "chapter" }
       ];
 
-      const children = existingLangUnit && Array.isArray(existingLangUnit.children)
-        ? existingLangUnit.children
-        : defaultChildren;
+      let children = defaultChildren;
+
+      if (existingLangUnit && Array.isArray(existingLangUnit.children) && existingLangUnit.children.length > 0) {
+        const rawChildren = existingLangUnit.children;
+        const tbCard = rawChildren.find(c => c.kind === "textbook" || c.name.toLowerCase().includes("textbook")) || defaultChildren[0];
+
+        const nonTbCards = rawChildren.filter(c => c !== tbCard && c.kind !== "textbook" && !c.name.toLowerCase().includes("textbook"));
+
+        const poemsCard: Unit = {
+          ...(nonTbCards[0] || defaultChildren[1]),
+          id: nonTbCards[0]?.id || `${subject.id}_${lang.code}_poems`,
+          number: "01",
+          name: "Poems",
+          description: nonTbCards[0]?.description && !nonTbCards[0].description.includes("Chapter") ? nonTbCards[0].description : `${lang.name} Prescribed Poems & Literary Verses`,
+          kind: "chapter"
+        };
+
+        const lessonsCard: Unit = {
+          ...(nonTbCards[1] || defaultChildren[2]),
+          id: nonTbCards[1]?.id || `${subject.id}_${lang.code}_lessons`,
+          number: "02",
+          name: "Lessons",
+          description: nonTbCards[1]?.description && !nonTbCards[1].description.includes("Chapter") ? nonTbCards[1].description : `${lang.name} Prescribed Lessons & Prose`,
+          kind: "chapter"
+        };
+
+        const essaysCard: Unit = {
+          ...(nonTbCards[2] || defaultChildren[3]),
+          id: nonTbCards[2]?.id || `${subject.id}_${lang.code}_essays`,
+          number: "03",
+          name: "Essays",
+          description: nonTbCards[2]?.description && !nonTbCards[2].description.includes("Chapter") ? nonTbCards[2].description : `${lang.name} Prescribed Essays & Composition`,
+          kind: "chapter"
+        };
+
+        children = [tbCard, poemsCard, lessonsCard, essaysCard];
+      }
 
       return {
         id: existingLangUnit?.id || `${subject.id}_${lang.code}`,
@@ -1552,20 +1641,6 @@ export default function SubjectHub({
         <p className="text-[#4E342E] text-xs leading-relaxed mb-4">
           {unit.description || `Comprehensive syllabus materials for ${unit.name}.`}
         </p>
-
-        {/* Topics List */}
-        {!isLabSubject && unit.topics && unit.topics.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-[#D8C4AC]/40 space-y-2">
-            <span className="text-[10px] font-extrabold text-[#A67C52] tracking-wider uppercase block">Core Topics:</span>
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {unit.topics.map((t, idx) => (
-                <span key={idx} className="bg-[#F8F4EF] border border-[#D8C4AC] text-[#4E342E] text-[10px] px-2 py-1 rounded-lg">
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Direct PDF Upload & Management for Lab Sections */}
         {isLabSubject ? (
@@ -1785,7 +1860,7 @@ export default function SubjectHub({
                 }`}
               >
                 <HelpCircle size={13} />
-                <span>Imp. Questions ({(unit.importantQuestions || []).length})</span>
+                <span>Imp. Questions ({getUnitQuestionPdfs(unit).length + (unit.importantQuestions || []).length})</span>
               </button>
 
               <button
@@ -2066,118 +2141,323 @@ export default function SubjectHub({
             </div>
           )}
 
-          {/* SUB-TAB 2: IMPORTANT QUESTIONS */}
-          {unitActiveTab[unit.id] === "questions" && (
-            <div className="space-y-3 animate-fade-in text-left">
-              {(!unit.importantQuestions || unit.importantQuestions.length === 0) ? (
-                <div className="p-3.5 bg-[#fff8f3] rounded-2xl border border-[#dac1c1]/30 space-y-2">
-                  <p className="text-[11px] font-bold text-[#40010d]">
-                    🎯 Core High-Yield Exam Questions for {unit.name}:
-                  </p>
-                  <div className="p-3 bg-white rounded-xl border border-amber-200/60 space-y-1">
-                    <span className="text-[9px] font-extrabold px-2 py-0.5 bg-red-100 text-red-700 rounded-md inline-block">
-                      Repeated University Exam Q
-                    </span>
-                    <h5 className="font-bold text-xs text-[#231a0a]">
-                      Q1: Define the core operational lifecycle and fundamental architecture of {unit.name}.
-                    </h5>
+          {/* SUB-TAB 2: IMPORTANT QUESTIONS & QUESTION PAPERS */}
+          {unitActiveTab[unit.id] === "questions" && (() => {
+            const questionPdfs = getUnitQuestionPdfs(unit);
+            const typedQuestions = unit.importantQuestions || [];
+            const hasAnyContent = questionPdfs.length > 0 || typedQuestions.length > 0;
+
+            return (
+              <div className="space-y-4 animate-fade-in text-left">
+                {/* High-Yield Header */}
+                <div className="p-3.5 bg-[#fff8f3] rounded-2xl border border-[#dac1c1]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#95491a] flex items-center gap-1.5">
+                      <span>🎯</span> High-Yield Exam Questions & Question Bank
+                    </p>
+                    <h4 className="font-extrabold text-xs sm:text-sm text-[#40010d]">
+                      {unit.name}
+                    </h4>
+                    <p className="text-[10px] text-[#544243]">
+                      Upload and access university exam question papers, 5/10-mark repeated questions, and solution PDFs.
+                    </p>
                   </div>
+                  {isAdmin && (
+                    <label
+                      htmlFor={`admin-unit-qpdf-btn-sub-${unit.id}`}
+                      className="px-3 py-2 bg-[#561C24] hover:bg-[#7a2c35] text-white rounded-xl text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs shrink-0 active:scale-95"
+                    >
+                      <Upload size={13} />
+                      <span>Upload Question PDF</span>
+                    </label>
+                  )}
                 </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {unit.importantQuestions.map((q, qIdx) => (
-                    <div key={q.id} className="p-3.5 bg-[#fff8f3]/90 hover:bg-[#ffebd6] rounded-2xl border border-[#dac1c1]/30 transition-all space-y-2">
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[9px] font-extrabold px-2 py-0.5 bg-[#40010d] text-white rounded-md">
-                              Q{qIdx + 1}
-                            </span>
-                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md ${
-                              q.importance === "High" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"
-                            }`}>
-                              {q.importance || "High"} Importance
-                            </span>
+
+                {/* Uploaded Question PDFs List */}
+                {questionPdfs.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-extrabold text-[#95491a] uppercase tracking-wider block">
+                      📄 Uploaded Question Papers & Study PDFs ({questionPdfs.length}):
+                    </span>
+                    <div className="space-y-2.5">
+                      {questionPdfs.map((qPdf) => {
+                        const status = getDownloadStatus(qPdf);
+                        return (
+                          <div
+                            key={qPdf.id}
+                            className="p-3.5 bg-[#fff8f3]/90 hover:bg-[#ffebd6] rounded-2xl border border-[#dac1c1]/30 flex flex-col transition-all gap-2.5 group/qpdf shadow-xs"
+                          >
+                            <div className="flex items-center gap-3 min-w-0 w-full">
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-[#561C24] text-white shadow-xs">
+                                <FileText size={16} />
+                              </div>
+                              <div className="text-left min-w-0 flex-1">
+                                <h5
+                                  className="font-bold text-xs sm:text-sm text-[#40010d] truncate whitespace-nowrap overflow-hidden text-ellipsis"
+                                  title={qPdf.name}
+                                >
+                                  {qPdf.name}
+                                </h5>
+                                <p className="text-[10px] text-[#877272] mt-0.5 flex items-center gap-1.5 truncate">
+                                  <span className="font-semibold">{qPdf.size || "PDF Document"}</span>
+                                  <span>•</span>
+                                  <span className="px-1.5 py-0.5 bg-red-100 text-red-700 font-extrabold rounded text-[9px]">
+                                    Important Question PDF
+                                  </span>
+                                  {qPdf.addedTime && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{qPdf.addedTime}</span>
+                                    </>
+                                  )}
+                                </p>
+                              </div>
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteQuestionPdf(unit.id, qPdf.id)}
+                                  className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all cursor-pointer shrink-0"
+                                  title="Delete Question PDF"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* View & Download Buttons */}
+                            <div className="flex items-center gap-2 pt-2 border-t border-[#dac1c1]/40 w-full">
+                              <button
+                                type="button"
+                                onClick={() => openMaterial(qPdf)}
+                                className="flex-1 px-3 py-1.5 bg-[#40010d] hover:bg-[#7a2c35] text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-95"
+                                title={`View ${qPdf.name}`}
+                              >
+                                <Eye size={13} />
+                                <span>View PDF</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadFile(qPdf)}
+                                disabled={status === "downloading"}
+                                className={`flex-1 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs active:scale-95 disabled:opacity-50 ${
+                                  status === "completed"
+                                    ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 font-extrabold"
+                                    : status === "error"
+                                    ? "bg-red-100 hover:bg-red-200 text-red-900 border border-red-300 font-extrabold"
+                                    : "bg-[#f8e6cb] hover:bg-[#fd9b65] text-[#95491a] hover:text-white"
+                                }`}
+                                title={status === "completed" ? "✓ Downloaded! Click to re-download" : status === "error" ? "Download failed. Click to retry" : "Download file directly to device"}
+                              >
+                                {status === "downloading" ? (
+                                  <>
+                                    <div className="w-3 h-3 border-2 border-amber-700 border-t-transparent rounded-full animate-spin" />
+                                    <span>Downloading...</span>
+                                  </>
+                                ) : status === "completed" ? (
+                                  <>
+                                    <FileCheck size={13} className="text-emerald-700" />
+                                    <span>✓ Downloaded</span>
+                                  </>
+                                ) : status === "error" ? (
+                                  <>
+                                    <Download size={13} className="text-red-700" />
+                                    <span>Retry</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download size={13} />
+                                    <span>Download</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           </div>
-                          <h5 className="font-bold text-xs text-[#40010d] leading-snug">
-                            {q.question}
-                          </h5>
-                        </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
-                        {isAdmin && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteImportantQuestion(unit.id, q.id)}
-                            className="p-1 text-red-500 hover:text-red-700 rounded-lg shrink-0 cursor-pointer"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        )}
+                {/* Upload Question PDF Dropzone for Admins */}
+                {isAdmin && (
+                  <div
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        handleProcessFile(e.dataTransfer.files[0], unit.id, "Important Questions");
+                      }
+                    }}
+                    className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition-all ${
+                      isDragging ? "border-[#95491a] bg-[#fff8f3]" : "border-[#fd9b65]/60 hover:border-[#95491a] bg-[#fffcf9]"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      id={`admin-unit-qpdf-btn-sub-${unit.id}`}
+                      accept="application/pdf,.pdf,.doc,.docx,.ppt,.pptx,image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleProcessFile(e.target.files[0], unit.id, "Important Questions");
+                        }
+                        e.target.value = "";
+                      }}
+                    />
+                    <label htmlFor={`admin-unit-qpdf-btn-sub-${unit.id}`} className="cursor-pointer space-y-1.5 block">
+                      <div className="w-10 h-10 rounded-full bg-[#561C24] text-white flex items-center justify-center mx-auto shadow-xs">
+                        <Upload size={18} />
                       </div>
+                      <div className="text-xs font-bold text-[#561C24]">
+                        Upload Important Questions / Question Bank PDF
+                      </div>
+                      <p className="text-[10px] text-[#8B6B52]">
+                        Drag & drop or <span className="text-[#95491a] font-bold underline">click to browse PDF/DOC</span> for {unit.name}
+                      </p>
+                      <p className="text-[9px] text-[#877272]">
+                        Supports Question Papers, Solved Question Banks & Model Papers
+                      </p>
+                    </label>
+                  </div>
+                )}
 
-                      {q.answer && (
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => setOpenQuestionId(openQuestionId === q.id ? null : q.id)}
-                            className="text-[10px] font-bold text-[#95491a] hover:underline flex items-center gap-1 cursor-pointer"
-                          >
-                            <span>{openQuestionId === q.id ? "Hide Solution ▲" : "Show Solution ▼"}</span>
-                          </button>
+                {/* Empty State when no PDFs and not Admin */}
+                {!hasAnyContent && !isAdmin && (
+                  <div className="p-4 bg-[#fff8f3] rounded-2xl border border-[#dac1c1]/30 text-center space-y-2">
+                    <HelpCircle size={28} className="text-[#95491a] mx-auto opacity-70" />
+                    <p className="text-xs font-bold text-[#40010d]">
+                      Important Question PDFs coming soon for {unit.name}.
+                    </p>
+                    <p className="text-[10px] text-[#877272]">
+                      Your instructors will upload unit question papers, repeated questions, and solution PDFs here.
+                    </p>
+                  </div>
+                )}
 
-                          {openQuestionId === q.id && (
-                            <div className="mt-2 p-3 bg-white rounded-xl border border-amber-200 text-[11px] text-[#231a0a] leading-relaxed whitespace-pre-wrap font-sans">
-                              {q.answer}
+                {/* Typed Questions List (if any exist) */}
+                {typedQuestions.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-[#dac1c1]/40">
+                    <span className="text-[10px] font-extrabold text-[#95491a] uppercase tracking-wider block">
+                      📝 Key Exam Questions ({typedQuestions.length}):
+                    </span>
+                    <div className="space-y-2.5">
+                      {typedQuestions.map((q, qIdx) => (
+                        <div key={q.id} className="p-3.5 bg-[#fff8f3]/90 hover:bg-[#ffebd6] rounded-2xl border border-[#dac1c1]/30 transition-all space-y-2">
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-extrabold px-2 py-0.5 bg-[#40010d] text-white rounded-md">
+                                  Q{qIdx + 1}
+                                </span>
+                                <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md ${
+                                  q.importance === "High" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"
+                                }`}>
+                                  {q.importance || "High"} Importance
+                                </span>
+                                {q.yearTag && (
+                                  <span className="text-[9px] text-[#95491a] bg-[#fff2e1] px-2 py-0.5 rounded-md font-bold">
+                                    {q.yearTag}
+                                  </span>
+                                )}
+                              </div>
+                              <h5 className="font-bold text-xs text-[#40010d] leading-snug">
+                                {q.question}
+                              </h5>
+                            </div>
+
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteImportantQuestion(unit.id, q.id)}
+                                className="p-1 text-red-500 hover:text-red-700 rounded-lg shrink-0 cursor-pointer"
+                                title="Delete Question"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+
+                          {q.answer && (
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => setOpenQuestionId(openQuestionId === q.id ? null : q.id)}
+                                className="text-[10px] font-bold text-[#95491a] hover:underline flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>{openQuestionId === q.id ? "Hide Solution ▲" : "Show Solution ▼"}</span>
+                              </button>
+
+                              {openQuestionId === q.id && (
+                                <div className="mt-2 p-3 bg-white rounded-xl border border-amber-200 text-[11px] text-[#231a0a] leading-relaxed whitespace-pre-wrap font-sans">
+                                  {q.answer}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                )}
 
-              {isAdmin && (
-                <div className="mt-3 p-3 bg-[#fffcf9] rounded-2xl border border-dashed border-[#fd9b65] space-y-2">
-                  <span className="text-[10px] font-extrabold text-[#40010d] uppercase block">
-                    ➕ Add Question for {unit.name}
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Type exam question..."
-                    value={qText}
-                    onChange={(e) => setQText(e.target.value)}
-                    className="w-full bg-white border border-[#dac1c1]/40 rounded-xl px-3 py-1.5 text-xs focus:outline-none"
-                  />
-                  <textarea
-                    rows={2}
-                    placeholder="Type solution..."
-                    value={qAnswer}
-                    onChange={(e) => setQAnswer(e.target.value)}
-                    className="w-full bg-white border border-[#dac1c1]/40 rounded-xl p-2.5 text-xs focus:outline-none font-sans"
-                  />
-                  <div className="flex justify-between items-center pt-1">
-                    <select
-                      value={qImportance}
-                      onChange={(e) => setQImportance(e.target.value as any)}
-                      className="bg-white border border-[#dac1c1]/40 rounded-lg text-[10px] px-2 py-1 font-bold text-[#544243]"
-                    >
-                      <option value="High">High Importance</option>
-                      <option value="Medium">Medium Importance</option>
-                      <option value="Low">Low / Optional</option>
-                    </select>
+                {/* Collapsible Manual Question Form (Optional for Admin) */}
+                {isAdmin && (
+                  <div className="pt-2 border-t border-dashed border-[#dac1c1]/40">
                     <button
                       type="button"
-                      onClick={() => handleAddImportantQuestion(unit.id)}
-                      className="px-3.5 py-1.5 bg-[#40010d] hover:bg-[#7a2c35] text-white rounded-xl text-[10px] font-bold cursor-pointer"
+                      onClick={() => setShowManualQuestionForm(prev => ({ ...prev, [unit.id]: !prev[unit.id] }))}
+                      className="text-[10px] font-extrabold text-[#95491a] hover:text-[#40010d] flex items-center gap-1.5 transition-colors cursor-pointer py-1"
                     >
-                      Save Question
+                      <span>{showManualQuestionForm[unit.id] ? "▲ Hide Manual Question Form" : "➕ Or Type Single Question Manually"}</span>
                     </button>
+
+                    {showManualQuestionForm[unit.id] && (
+                      <div className="mt-2 p-3 bg-[#fffcf9] rounded-2xl border border-dashed border-[#fd9b65] space-y-2 animate-fade-in">
+                        <span className="text-[10px] font-extrabold text-[#40010d] uppercase block">
+                          Add Question for {unit.name}
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="Type exam question here..."
+                          value={qText}
+                          onChange={(e) => setQText(e.target.value)}
+                          className="w-full bg-white border border-[#dac1c1]/40 focus:border-[#fd9b65] rounded-xl px-3 py-1.5 text-xs focus:outline-none"
+                        />
+                        <textarea
+                          rows={2}
+                          placeholder="Type solution or step-by-step answer key..."
+                          value={qAnswer}
+                          onChange={(e) => setQAnswer(e.target.value)}
+                          className="w-full bg-white border border-[#dac1c1]/40 focus:border-[#fd9b65] rounded-xl p-2.5 text-xs focus:outline-none font-sans"
+                        />
+                        <div className="flex justify-between items-center pt-1">
+                          <select
+                            value={qImportance}
+                            onChange={(e) => setQImportance(e.target.value as any)}
+                            className="bg-white border border-[#dac1c1]/40 rounded-lg text-[10px] px-2 py-1 focus:outline-none font-bold text-[#544243]"
+                          >
+                            <option value="High">High Importance (Repeated)</option>
+                            <option value="Medium">Medium Importance</option>
+                            <option value="Low">Low / Optional</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => handleAddImportantQuestion(unit.id)}
+                            className="px-3.5 py-1.5 bg-[#40010d] hover:bg-[#7a2c35] text-white rounded-xl text-[10px] font-bold cursor-pointer transition-all shadow-xs"
+                          >
+                            Save Question
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            );
+          })()}
 
           {/* SUB-TAB 3: YOUTUBE VIDEO REFERENCES */}
           {unitActiveTab[unit.id] === "youtube" && (
@@ -2603,7 +2883,7 @@ export default function SubjectHub({
             {isLang2Subject ? (
               <div className="space-y-6">
                 <div className="bg-[#fff8f3] p-4 rounded-2xl border border-[#dac1c1]/30 text-xs font-semibold text-[#544243]">
-                  💡 Select a language option below to view its <strong>Textbook, Chapter 1, Chapter 2, Chapter 3, and Chapter 4</strong> study materials:
+                  💡 Select a language option below to view its <strong>Textbook, Poems, Lessons, and Essays</strong> study materials:
                 </div>
 
                 <div className="space-y-4">
@@ -2627,7 +2907,7 @@ export default function SubjectHub({
                                 {langOption.name}
                               </h3>
                               <p className="text-xs text-[#8B6B52]">
-                                Includes Textbook and Chapters 1 - 4
+                                Includes Textbook, Poems, Lessons, and Essays
                               </p>
                             </div>
                           </div>

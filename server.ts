@@ -4,10 +4,17 @@ import fs from "fs";
 import fsPromises from "fs/promises";
 import dotenv from "dotenv";
 import multer from "multer";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
+
+// Global unhandled error recovery for container resilience
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[SERVER PROCESS] Unhandled Rejection at:", promise, "reason:", reason);
+});
+process.on("uncaughtException", (error) => {
+  console.error("[SERVER PROCESS] Uncaught Exception:", error);
+});
 
 const app = express();
 const PORT = 3000;
@@ -71,6 +78,7 @@ app.get("/api/health", (req, res) => {
 
 // GET /api/notifications - Retrieve globally published notifications
 const NOTIFICATIONS_FILE = path.join(DATA_DIR, "notifications.json");
+const FEEDBACK_FILE = path.join(DATA_DIR, "feedback.json");
 
 app.get("/api/notifications", async (req, res) => {
   try {
@@ -107,6 +115,103 @@ app.post("/api/notifications", async (req, res) => {
     return res.json({ success: true, notifications: currentNotifs });
   } catch (error: any) {
     return res.status(500).json({ error: "Failed to broadcast notification", details: error.message });
+  }
+});
+
+// GET /api/feedback - Retrieve all student feedback
+app.get("/api/feedback", async (req, res) => {
+  try {
+    if (fs.existsSync(FEEDBACK_FILE)) {
+      const data = await fsPromises.readFile(FEEDBACK_FILE, "utf-8");
+      return res.json(JSON.parse(data));
+    }
+    return res.json([]);
+  } catch (error) {
+    return res.status(500).json({ error: "Failed to read student feedback" });
+  }
+});
+
+// POST /api/feedback - Submit new feedback or update feedback list
+app.post("/api/feedback", async (req, res) => {
+  try {
+    const payload = req.body;
+    let feedbackList: any[] = [];
+    if (fs.existsSync(FEEDBACK_FILE)) {
+      try {
+        const data = await fsPromises.readFile(FEEDBACK_FILE, "utf-8");
+        feedbackList = JSON.parse(data);
+      } catch (e) {
+        feedbackList = [];
+      }
+    }
+
+    if (Array.isArray(payload)) {
+      feedbackList = payload;
+    } else if (payload && payload.message) {
+      const newFeedback = {
+        id: payload.id || "fb_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+        studentName: payload.studentName || "Anonymous Student",
+        studentEmail: payload.studentEmail || "",
+        courseName: payload.courseName || "",
+        semesterName: payload.semesterName || "",
+        rating: typeof payload.rating === "number" ? payload.rating : 5,
+        category: payload.category || "experience",
+        message: payload.message,
+        timestamp: payload.timestamp || new Date().toLocaleString(),
+        status: payload.status || "unread",
+        adminNote: payload.adminNote || "",
+        createdAt: payload.createdAt || Date.now()
+      };
+      feedbackList = [newFeedback, ...feedbackList.filter(f => f.id !== newFeedback.id)];
+    }
+
+    await fsPromises.writeFile(FEEDBACK_FILE, JSON.stringify(feedbackList, null, 2));
+    console.log(`[SERVER FEEDBACK] Successfully saved student feedback to disk (${feedbackList.length} total entries).`);
+    return res.json({ success: true, feedback: feedbackList });
+  } catch (error: any) {
+    console.error("[SERVER FEEDBACK ERROR]", error);
+    return res.status(500).json({ error: "Failed to save student feedback", details: error.message });
+  }
+});
+
+// PATCH /api/feedback/:id - Update status or admin note
+app.patch("/api/feedback/:id", async (req, res) => {
+  try {
+    const feedbackId = req.params.id;
+    const { status, adminNote } = req.body;
+    let feedbackList: any[] = [];
+    if (fs.existsSync(FEEDBACK_FILE)) {
+      const data = await fsPromises.readFile(FEEDBACK_FILE, "utf-8");
+      feedbackList = JSON.parse(data);
+    }
+    const target = feedbackList.find(f => f.id === feedbackId);
+    if (!target) {
+      return res.status(404).json({ error: "Feedback item not found" });
+    }
+    if (status !== undefined) target.status = status;
+    if (adminNote !== undefined) target.adminNote = adminNote;
+
+    await fsPromises.writeFile(FEEDBACK_FILE, JSON.stringify(feedbackList, null, 2));
+    return res.json({ success: true, item: target });
+  } catch (error: any) {
+    return res.status(500).json({ error: "Failed to update feedback item" });
+  }
+});
+
+// DELETE /api/feedback/:id - Remove feedback
+app.delete("/api/feedback/:id", async (req, res) => {
+  try {
+    const feedbackId = req.params.id;
+    let feedbackList: any[] = [];
+    if (fs.existsSync(FEEDBACK_FILE)) {
+      const data = await fsPromises.readFile(FEEDBACK_FILE, "utf-8");
+      feedbackList = JSON.parse(data);
+    }
+    feedbackList = feedbackList.filter(f => f.id !== feedbackId);
+    await fsPromises.writeFile(FEEDBACK_FILE, JSON.stringify(feedbackList, null, 2));
+    return res.json({ success: true, feedback: feedbackList });
+  } catch (error: any) {
+    return res.status(500).json({ error: "Failed to delete feedback item" });
   }
 });
 
@@ -334,9 +439,10 @@ app.get("/api/files/:fileId", (req, res) => {
   }
 });
 
-// Configure Vite or Static files
+// Configure Vite in development or Static files in production
 async function setupVite() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -345,8 +451,13 @@ async function setupVite() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+    app.get("*", (_req, res) => {
+      const indexPath = path.join(distPath, "index.html");
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(200).send("<html><head><title>Read Rabbit</title></head><body><div id='root'></div></body></html>");
+      }
     });
   }
 }
@@ -355,5 +466,7 @@ setupVite().then(() => {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
+}).catch((err) => {
+  console.error("[SERVER BOOT ERROR] Failed to start server:", err);
 });
 

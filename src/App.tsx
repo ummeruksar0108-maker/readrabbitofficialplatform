@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { initialCourses, ensureAllLanguageCardsExist } from "./data";
-import { Course, Subject, Semester, Unit, StudyMaterial, AppNotification } from "./types";
+import { Course, Subject, Semester, Unit, StudyMaterial, AppNotification, StudentFeedback, FeedbackStatus } from "./types";
 
 // Import Components
 import Sidebar from "./components/Sidebar";
@@ -16,13 +16,14 @@ import AdminPortal from "./components/AdminPortal";
 import AddSubjectModal from "./components/AddSubjectModal";
 import PasswordResetModal from "./components/PasswordResetModal";
 import GlobalSearchModal from "./components/GlobalSearchModal";
+import StudentFeedbackModal from "./components/StudentFeedbackModal";
 import FirebaseDiagnosticsPanel from "./components/FirebaseDiagnosticsPanel";
 import { Logo } from "./components/Logo";
-import { logDiagnostic, saveCoursesToFirestore, loadCoursesFromFirestore, subscribeCoursesFromFirestore, saveNotificationsToFirestore, subscribeNotificationsFromFirestore } from "./lib/firebase";
+import { logDiagnostic, saveCoursesToFirestore, loadCoursesFromFirestore, subscribeCoursesFromFirestore, saveNotificationsToFirestore, subscribeNotificationsFromFirestore, saveFeedbackToFirestore, subscribeFeedbackFromFirestore } from "./lib/firebase";
 import { supabase, fetchAllMaterialsFromSupabaseDB, mergeSupabaseMaterialsIntoCourses } from "./lib/supabase";
 
 // Icons for Responsive Top Bar
-import { Menu, Search, X, Sparkles, Layers, ShieldCheck, Settings, HelpCircle, Bell, BookOpen, RefreshCw, ArrowLeft, LogOut, Palette, Check } from "lucide-react";
+import { Menu, Search, X, Sparkles, Layers, ShieldCheck, Settings, HelpCircle, Bell, BookOpen, RefreshCw, ArrowLeft, LogOut, Palette, Check, MessageSquareHeart } from "lucide-react";
 import { bgPresets } from "./components/ExtraTabs";
 
 
@@ -76,13 +77,8 @@ export default function App() {
     };
   }, []);
 
-  // Splash Screen State - always land on entry page when website is opened
-  const [isSplash, setIsSplash] = useState(() => {
-    if (initialHashState && initialHashState.isSplash === false && window.location.hash.includes("course=")) {
-      return false;
-    }
-    return true;
-  });
+  // Splash Screen State - always land on entry page ("Enter the Burrow") when website is opened or revisited
+  const [isSplash, setIsSplash] = useState<boolean>(true);
 
   // Core Courses State with Local Storage persistence
   const [courses, setCourses] = useState<Course[]>(() => {
@@ -110,7 +106,7 @@ export default function App() {
   // Active state tracks
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(() => {
     if (initialHashState && initialHashState.courseId) return initialHashState.courseId;
-    return localStorage.getItem("read_rabbit_selected_course_id") || null;
+    return localStorage.getItem("read_rabbit_selected_course_id") || "general";
   });
   const [selectedSemesterId, setSelectedSemesterId] = useState<number | null>(() => {
     if (initialHashState && initialHashState.semId !== null) return initialHashState.semId;
@@ -143,9 +139,12 @@ export default function App() {
   // Modal control states
   const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
 
-  // Student Profile Info
+  // Student Profile Info (permanently saved)
   const [studentName, setStudentName] = useState(() => {
     return localStorage.getItem("read_rabbit_student_name") || "Little Bunny";
+  });
+  const [studentEmail, setStudentEmail] = useState(() => {
+    return localStorage.getItem("read_rabbit_student_email") || "";
   });
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -302,6 +301,175 @@ export default function App() {
       body: JSON.stringify([])
     }).catch(err => console.warn("[Server Notif Clear Fail]", err));
     saveNotificationsToFirestore([]);
+  };
+
+  // Student Feedback State
+  const [feedbackList, setFeedbackList] = useState<StudentFeedback[]>(() => {
+    const saved = localStorage.getItem("read_rabbit_feedback_v1");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error("Failed to parse feedback from storage:", e);
+      }
+    }
+    return [
+      {
+        id: "fb_seed_1",
+        studentName: "Priya Sharma",
+        studentEmail: "priya.s@student.edu",
+        courseName: "BCA GENERAL",
+        semesterName: "Semester 3",
+        rating: 5,
+        category: "experience",
+        message: "The subject roadmaps and in-app PDF viewer made revising for midterms so much smoother! Love the rabbit aesthetic and clean UI.",
+        timestamp: "Yesterday, 3:20 PM",
+        status: "reviewed",
+        adminNote: "Positive review acknowledged. Encouraged to explore PYQs library.",
+        createdAt: Date.now() - 86400000
+      },
+      {
+        id: "fb_seed_2",
+        studentName: "Rahul Varma",
+        studentEmail: "rahul.v@student.edu",
+        courseName: "BCA AI/ML",
+        semesterName: "Semester 2",
+        rating: 4,
+        category: "materials",
+        message: "Could you please add more solved question papers for 8085 Microprocessor Assembly language lab programs from 2022-2023?",
+        timestamp: "Today, 11:15 AM",
+        status: "unread",
+        adminNote: "",
+        createdAt: Date.now() - 14400000
+      }
+    ];
+  });
+
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+
+  // Sync feedback to localStorage
+  useEffect(() => {
+    localStorage.setItem("read_rabbit_feedback_v1", JSON.stringify(feedbackList));
+  }, [feedbackList]);
+
+  // Real-time Firestore feedback listener & server sync
+  useEffect(() => {
+    // 1. Initial fetch from Express server disk
+    fetch("/api/feedback")
+      .then(res => res.ok ? res.json() : [])
+      .then(serverFeedback => {
+        if (Array.isArray(serverFeedback) && serverFeedback.length > 0) {
+          setFeedbackList(prev => {
+            const combined = [...serverFeedback];
+            prev.forEach(p => {
+              if (!combined.some(c => c.id === p.id)) {
+                combined.push(p);
+              }
+            });
+            return combined;
+          });
+        }
+      })
+      .catch(() => {});
+
+    // 2. Real-time Firestore feedback listener
+    const unsubscribe = subscribeFeedbackFromFirestore((remoteFeedback) => {
+      if (Array.isArray(remoteFeedback) && remoteFeedback.length > 0) {
+        setFeedbackList(prev => {
+          const combined = [...remoteFeedback];
+          prev.forEach(p => {
+            if (!combined.some(c => c.id === p.id)) {
+              combined.push(p);
+            }
+          });
+          return combined;
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Submit new feedback handler
+  const handleSubmitFeedback = async (
+    data: Omit<StudentFeedback, "id" | "timestamp" | "status" | "createdAt">
+  ): Promise<boolean> => {
+    const newFeedback: StudentFeedback = {
+      ...data,
+      id: "fb_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + ", " + new Date().toLocaleDateString([], { month: "short", day: "numeric" }),
+      status: "unread",
+      createdAt: Date.now()
+    };
+
+    setFeedbackList(prev => {
+      const updated = [newFeedback, ...prev];
+      // Sync to Express Server
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      }).catch(err => console.warn("[Server Feedback Sync Fail]", err));
+
+      // Sync to Firestore Cloud
+      saveFeedbackToFirestore(updated);
+      return updated;
+    });
+
+    return true;
+  };
+
+  // Update feedback status & admin note
+  const handleUpdateFeedbackStatus = async (
+    id: string,
+    status: FeedbackStatus,
+    adminNote?: string
+  ): Promise<void> => {
+    setFeedbackList(prev => {
+      const updated = prev.map(item => {
+        if (item.id === id) {
+          return {
+            ...item,
+            status,
+            adminNote: adminNote !== undefined ? adminNote : item.adminNote
+          };
+        }
+        return item;
+      });
+
+      // Sync to Express Server
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      }).catch(err => console.warn("[Server Feedback Sync Fail]", err));
+
+      // Sync to Firestore Cloud
+      saveFeedbackToFirestore(updated);
+      return updated;
+    });
+  };
+
+  // Delete feedback item
+  const handleDeleteFeedback = async (id: string): Promise<void> => {
+    setFeedbackList(prev => {
+      const updated = prev.filter(f => f.id !== id);
+      fetch(`/api/feedback/${id}`, { method: "DELETE" }).catch(() => {});
+      saveFeedbackToFirestore(updated);
+      return updated;
+    });
+  };
+
+  // Clear all feedback
+  const handleClearAllFeedback = async (): Promise<void> => {
+    setFeedbackList([]);
+    fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([])
+    }).catch(() => {});
+    saveFeedbackToFirestore([]);
   };
 
   // Secret admin backdoor trigger
@@ -902,23 +1070,44 @@ export default function App() {
     return await saveCurriculumToServer(nextCourses);
   };
 
+  // Handle entering the Burrow from Splash screen
+  const handleEnterBurrow = (name?: string, email?: string) => {
+    if (name) {
+      setStudentName(name);
+      localStorage.setItem("read_rabbit_student_name", name);
+    }
+    if (email) {
+      setStudentEmail(email);
+      localStorage.setItem("read_rabbit_student_email", email);
+    }
+    setIsSplash(false);
+    localStorage.setItem("read_rabbit_is_splash", "false");
+
+    // Seamlessly land directly on the Semester Roadmap page
+    const targetCourseId = selectedCourseId || (courses && courses.length > 0 ? courses[0].id : "general");
+    setSelectedCourseId(targetCourseId);
+    setSelectedSemesterId(null);
+    setSelectedSubjectId(null);
+    setActiveTab("semesters");
+    pushAppHistory(targetCourseId, null, null, "semesters");
+  };
+
   // Exit App handler (Splash trigger)
   const handleExitApp = () => {
     setIsSplash(true);
-    setSelectedCourseId(null);
     setSelectedSemesterId(null);
     setSelectedSubjectId(null);
     setIsAdmin(false);
+    setActiveTab("semesters");
   };
 
-  // 1. Splash Screen
+  // 1. Splash Screen ("Enter The Burrow" landing)
   if (isSplash) {
     return (
       <Splash
-        onEnter={() => {
-          setIsSplash(false);
-          localStorage.setItem("read_rabbit_is_splash", "false");
-        }}
+        onEnter={handleEnterBurrow}
+        savedName={studentName}
+        savedEmail={studentEmail}
       />
     );
   }
@@ -1036,6 +1225,17 @@ export default function App() {
 
 
 
+            {/* Student Feedback Trigger Button (Option B - Navigation Bar / Header) */}
+            <button
+              type="button"
+              onClick={() => setIsFeedbackModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FAF3E0] hover:bg-[#fff2e1] text-[#40010d] hover:text-[#ba1a1a] rounded-xl border border-[#dac1c1]/40 hover:border-[#fd9b65] transition-all text-xs font-bold cursor-pointer shadow-2xs group"
+              title="Share feedback or request notes & question papers"
+            >
+              <MessageSquareHeart size={15} className="text-[#95491a] group-hover:scale-110 group-hover:text-[#ba1a1a] transition-transform shrink-0" />
+              <span className="hidden sm:inline">Feedback</span>
+            </button>
+
             {/* Notification trigger with custom drawer popup */}
             <div className="relative">
               <button
@@ -1147,15 +1347,31 @@ export default function App() {
               </span>
             </button>
 
-            {/* Profile badge */}
-            <div className="flex items-center gap-2 px-3 py-1 bg-white rounded-xl border border-[#dac1c1]/20 shadow-xs">
-              <div className="w-7 h-7 rounded-full bg-[#f8e6cb] flex items-center justify-center font-sans text-xs font-bold text-[#95491a]">
-                {studentName.charAt(0)}
+            {/* Profile badge with click to open settings */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("settings");
+                setSelectedSemesterId(null);
+                setSelectedSubjectId(null);
+              }}
+              className="flex items-center gap-2 px-3 py-1 bg-white hover:bg-[#FAF3E0] rounded-xl border border-[#dac1c1]/20 shadow-xs cursor-pointer transition-colors text-left"
+              title={`Profile: ${studentName}${studentEmail ? ` (${studentEmail})` : ''} - Click to customize`}
+            >
+              <div className="w-7 h-7 rounded-full bg-[#f8e6cb] border border-[#D97706]/30 flex items-center justify-center font-sans text-xs font-bold text-[#95491a] shrink-0">
+                {studentName.charAt(0).toUpperCase()}
               </div>
-              <span className="hidden md:inline font-sans text-xs font-bold text-[#544243]">
-                {studentName}
-              </span>
-            </div>
+              <div className="hidden md:flex flex-col">
+                <span className="font-sans text-xs font-bold text-[#544243] leading-tight">
+                  {studentName}
+                </span>
+                {studentEmail && (
+                  <span className="font-mono text-[9px] text-[#877272] leading-tight max-w-[110px] truncate">
+                    {studentEmail}
+                  </span>
+                )}
+              </div>
+            </button>
           </div>
         </header>
 
@@ -1353,6 +1569,8 @@ export default function App() {
               }}
               studentName={studentName}
               setStudentName={setStudentName}
+              studentEmail={studentEmail}
+              setStudentEmail={setStudentEmail}
               bgColor={bgColor}
               setBgColor={setBgColor}
             />
@@ -1369,6 +1587,10 @@ export default function App() {
               notifications={notifications}
               onDeleteNotification={handleDeleteNotification}
               onClearAllNotifications={handleClearAllNotifs}
+              feedbackList={feedbackList}
+              onUpdateFeedbackStatus={handleUpdateFeedbackStatus}
+              onDeleteFeedback={handleDeleteFeedback}
+              onClearAllFeedback={handleClearAllFeedback}
               onClose={() => {
                 setActiveTab("semesters");
                 setSelectedSemesterId(null);
@@ -1445,6 +1667,19 @@ export default function App() {
             onNavigateToSubject={handleNavigateFromSearchSubject}
             onNavigateToUnit={handleNavigateFromSearchUnit}
             onNavigateToLibrary={handleNavigateFromSearchLibrary}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Student Feedback & Experience Modal (Option B Triggered) */}
+      <AnimatePresence>
+        {isFeedbackModalOpen && (
+          <StudentFeedbackModal
+            isOpen={isFeedbackModalOpen}
+            onClose={() => setIsFeedbackModalOpen(false)}
+            onSubmitFeedback={handleSubmitFeedback}
+            activeCourseName={activeCourse?.name}
+            activeSemesterName={activeSemester?.name}
           />
         )}
       </AnimatePresence>

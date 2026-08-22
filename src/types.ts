@@ -37,6 +37,7 @@ export interface Unit {
   materials?: StudyMaterial[];
   textbooks?: StudyMaterial[];
   importantQuestions?: ImportantQuestion[];
+  importantQuestionsPdfs?: StudyMaterial[];
   youtubeLinks?: YouTubeReference[];
   kind?: UnitKind;
   children?: Unit[];
@@ -105,5 +106,23 @@ export interface ChatMessage {
   role: "user" | "model";
   text: string;
   timestamp: Date;
+}
+
+export type FeedbackCategory = "experience" | "materials" | "suggestion" | "bug" | "other";
+export type FeedbackStatus = "unread" | "reviewed" | "resolved";
+
+export interface StudentFeedback {
+  id: string;
+  studentName?: string;
+  studentEmail?: string;
+  courseName?: string;
+  semesterName?: string;
+  rating: number; // 1 to 5
+  category: FeedbackCategory;
+  message: string;
+  timestamp: string;
+  status: FeedbackStatus;
+  adminNote?: string;
+  createdAt: number;
 }
 

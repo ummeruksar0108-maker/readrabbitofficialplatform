@@ -1,4 +1,4 @@
-import { Course, StudyMaterial } from "./types";
+import { Course, StudyMaterial, Unit } from "./types";
 
 export const initialCourses: Course[] = [
   {
@@ -497,8 +497,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "kan_s1_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -506,8 +506,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "kan_s1_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -515,17 +515,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "kan_s1_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "kan_s1_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -553,8 +544,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "hin_s1_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -562,8 +553,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "hin_s1_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -571,17 +562,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "hin_s1_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "hin_s1_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -609,8 +591,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ae_s1_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -618,8 +600,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ae_s1_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -627,17 +609,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ae_s1_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ae_s1_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1126,8 +1099,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "kan_s2_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1135,8 +1108,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "kan_s2_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1144,17 +1117,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "kan_s2_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "kan_s2_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1182,8 +1146,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "hin_s2_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1191,8 +1155,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "hin_s2_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1200,17 +1164,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "hin_s2_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "hin_s2_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1238,8 +1193,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ae_s2_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1247,8 +1202,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ae_s2_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1256,17 +1211,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ae_s2_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ae_s2_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1797,8 +1743,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "kan_s3_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1806,8 +1752,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "kan_s3_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1815,17 +1761,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "kan_s3_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "kan_s3_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1853,8 +1790,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "hin_s3_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1862,8 +1799,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "hin_s3_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1871,17 +1808,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "hin_s3_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "hin_s3_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1909,8 +1837,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ae_s3_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1918,8 +1846,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ae_s3_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -1927,17 +1855,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ae_s3_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ae_s3_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -2468,8 +2387,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "kan_s4_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -2477,8 +2396,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "kan_s4_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -2486,17 +2405,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "kan_s4_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "kan_s4_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -2524,8 +2434,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "hin_s4_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -2533,8 +2443,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "hin_s4_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -2542,17 +2452,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "hin_s4_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "hin_s4_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -2580,8 +2481,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ae_s4_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -2589,8 +2490,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ae_s4_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -2598,17 +2499,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ae_s4_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ae_s4_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3058,8 +2950,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_kan_s5_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3067,8 +2959,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_kan_s5_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3076,17 +2968,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_kan_s5_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "aiml_kan_s5_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3114,8 +2997,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_hin_s5_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3123,8 +3006,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_hin_s5_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3132,17 +3015,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_hin_s5_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "aiml_hin_s5_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3170,8 +3044,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_ae_s5_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3179,8 +3053,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_ae_s5_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3188,17 +3062,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_ae_s5_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "aiml_ae_s5_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3610,8 +3475,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_kan_s6_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3619,8 +3484,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_kan_s6_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3628,17 +3493,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_kan_s6_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "aiml_kan_s6_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3666,8 +3522,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_hin_s6_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3675,8 +3531,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_hin_s6_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3684,17 +3540,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_hin_s6_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "aiml_hin_s6_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3722,8 +3569,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_ae_s6_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3731,8 +3578,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_ae_s6_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -3740,17 +3587,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "aiml_ae_s6_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "aiml_ae_s6_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4260,8 +4098,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_kan_s1_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4269,8 +4107,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_kan_s1_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4278,17 +4116,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_kan_s1_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "gen_kan_s1_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4316,8 +4145,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_hin_s1_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4325,8 +4154,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_hin_s1_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4334,17 +4163,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_hin_s1_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "gen_hin_s1_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4372,8 +4192,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_ae_s1_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4381,8 +4201,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_ae_s1_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4390,17 +4210,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_ae_s1_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "gen_ae_s1_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4889,8 +4700,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_kan_s2_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4898,8 +4709,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_kan_s2_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4907,17 +4718,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_kan_s2_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "gen_kan_s2_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4945,8 +4747,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_hin_s2_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4954,8 +4756,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_hin_s2_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -4963,17 +4765,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_hin_s2_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "gen_hin_s2_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5001,8 +4794,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_ae_s2_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5010,8 +4803,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_ae_s2_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5019,17 +4812,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "gen_ae_s2_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "gen_ae_s2_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5256,8 +5040,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_kan_s3_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5265,8 +5049,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_kan_s3_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5274,17 +5058,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_kan_s3_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "general_kan_s3_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5312,8 +5087,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_hin_s3_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5321,8 +5096,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_hin_s3_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5330,17 +5105,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_hin_s3_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "general_hin_s3_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5368,8 +5134,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_ae_s3_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5377,8 +5143,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_ae_s3_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5386,17 +5152,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_ae_s3_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "general_ae_s3_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5565,8 +5322,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_kan_s4_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5574,8 +5331,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_kan_s4_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5583,17 +5340,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_kan_s4_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "general_kan_s4_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5621,8 +5369,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_hin_s4_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5630,8 +5378,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_hin_s4_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5639,17 +5387,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_hin_s4_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "general_hin_s4_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5677,8 +5416,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_ae_s4_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5686,8 +5425,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_ae_s4_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5695,17 +5434,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_ae_s4_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "general_ae_s4_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5874,8 +5604,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_kan_s5_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5883,8 +5613,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_kan_s5_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5892,17 +5622,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_kan_s5_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "general_kan_s5_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5930,8 +5651,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_hin_s5_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5939,8 +5660,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_hin_s5_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5948,17 +5669,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_hin_s5_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "general_hin_s5_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5986,8 +5698,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_ae_s5_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -5995,8 +5707,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_ae_s5_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6004,17 +5716,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_ae_s5_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "general_ae_s5_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6230,8 +5933,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_kan_s6_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6239,8 +5942,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_kan_s6_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6248,17 +5951,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_kan_s6_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "general_kan_s6_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6286,8 +5980,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_hin_s6_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6295,8 +5989,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_hin_s6_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6304,17 +5998,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_hin_s6_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "general_hin_s6_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6342,8 +6027,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_ae_s6_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6351,8 +6036,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_ae_s6_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6360,17 +6045,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "general_ae_s6_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "general_ae_s6_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6839,8 +6515,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s1_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6848,8 +6524,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s1_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6857,17 +6533,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s1_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_kan_s1_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6895,8 +6562,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s1_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6904,8 +6571,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s1_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6913,17 +6580,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s1_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_hin_s1_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6951,8 +6609,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s1_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6960,8 +6618,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s1_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -6969,17 +6627,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s1_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_ae_s1_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -7468,8 +7117,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s2_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -7477,8 +7126,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s2_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -7486,17 +7135,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s2_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_kan_s2_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -7524,8 +7164,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s2_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -7533,8 +7173,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s2_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -7542,17 +7182,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s2_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_hin_s2_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -7580,8 +7211,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s2_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -7589,8 +7220,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s2_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -7598,17 +7229,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s2_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_ae_s2_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8139,8 +7761,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s3_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8148,8 +7770,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s3_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8157,17 +7779,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s3_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_kan_s3_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8195,8 +7808,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s3_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8204,8 +7817,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s3_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8213,17 +7826,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s3_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_hin_s3_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8251,8 +7855,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s3_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8260,8 +7864,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s3_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8269,17 +7873,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s3_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_ae_s3_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8810,8 +8405,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s4_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8819,8 +8414,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s4_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8828,17 +8423,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s4_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_kan_s4_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8866,8 +8452,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s4_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8875,8 +8461,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s4_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8884,17 +8470,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s4_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_hin_s4_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8922,8 +8499,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s4_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8931,8 +8508,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s4_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -8940,17 +8517,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s4_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_ae_s4_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9119,8 +8687,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s5_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9128,8 +8696,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s5_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9137,17 +8705,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s5_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_kan_s5_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9175,8 +8734,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s5_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9184,8 +8743,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s5_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9193,17 +8752,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s5_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_hin_s5_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9231,8 +8781,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s5_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9240,8 +8790,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s5_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9249,17 +8799,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s5_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_ae_s5_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9475,8 +9016,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s6_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Kannada Chapter 1",
+                    "name": "Poems",
+                    "description": "Kannada Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9484,8 +9025,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s6_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Kannada Chapter 2",
+                    "name": "Lessons",
+                    "description": "Kannada Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9493,17 +9034,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_kan_s6_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Kannada Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_kan_s6_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Kannada Chapter 4",
+                    "name": "Essays",
+                    "description": "Kannada Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9531,8 +9063,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s6_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Hindi Chapter 1",
+                    "name": "Poems",
+                    "description": "Hindi Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9540,8 +9072,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s6_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Hindi Chapter 2",
+                    "name": "Lessons",
+                    "description": "Hindi Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9549,17 +9081,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_hin_s6_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Hindi Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_hin_s6_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Hindi Chapter 4",
+                    "name": "Essays",
+                    "description": "Hindi Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9587,8 +9110,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s6_ch1",
                     "number": "01",
-                    "name": "Chapter 1",
-                    "description": "Additional English Chapter 1",
+                    "name": "Poems",
+                    "description": "Additional English Prescribed Poems & Literary Verses",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9596,8 +9119,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s6_ch2",
                     "number": "02",
-                    "name": "Chapter 2",
-                    "description": "Additional English Chapter 2",
+                    "name": "Lessons",
+                    "description": "Additional English Prescribed Lessons & Prose",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9605,17 +9128,8 @@ export const initialCourses: Course[] = [
                   {
                     "id": "ds_ae_s6_ch3",
                     "number": "03",
-                    "name": "Chapter 3",
-                    "description": "Additional English Chapter 3",
-                    "masteryPercent": 0,
-                    "status": "Locked",
-                    "kind": "chapter"
-                  },
-                  {
-                    "id": "ds_ae_s6_ch4",
-                    "number": "04",
-                    "name": "Chapter 4",
-                    "description": "Additional English Chapter 4",
+                    "name": "Essays",
+                    "description": "Additional English Prescribed Essays & Composition",
                     "masteryPercent": 0,
                     "status": "Locked",
                     "kind": "chapter"
@@ -9628,42 +9142,6 @@ export const initialCourses: Course[] = [
         ]
       }
     ]
-  }
-];
-
-export const mockQuizQuestions = [
-  {
-    "question": "What is the key benefit of Polymorphism in Java?",
-    "options": [
-      "It allows you to restrict unauthorized access to class variables.",
-      "It allows one interface to be used for a general class of actions, resolving implementations at runtime.",
-      "It speeds up compilation and decreases memory footprint of JVM instances.",
-      "It prevents classes from being subclassed or modified by other packages."
-    ],
-    "answer": 1,
-    "explanation": "Polymorphism allows objects of different classes to be treated as objects of a common superclass, specifically letting a single interface define a group of actions resolved dynamically at runtime."
-  },
-  {
-    "question": "Which keyword is used to establish inheritance between classes in Java?",
-    "options": [
-      "implements",
-      "inherits",
-      "extends",
-      "import"
-    ],
-    "answer": 2,
-    "explanation": "The 'extends' keyword is used in Java to indicate that a class is inherited from another class (superclass)."
-  },
-  {
-    "question": "What is encapsulation?",
-    "options": [
-      "The process of combining data and the methods that operate on that data into a single unit (class) while restricting direct access.",
-      "The technique of overriding superclass methods in subclasses.",
-      "A way to define multiple methods with the same name but different signatures.",
-      "The mechanism of loading compiled classes into the JVM memory space."
-    ],
-    "answer": 0,
-    "explanation": "Encapsulation is bundling data and methods together in a class and hiding implementation details through private fields and public getters/setters."
   }
 ];
 
@@ -9717,7 +9195,8 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
         });
       }
 
-      // 2. Language II Card
+      // 2. Language II Card (Kannada, Hindi, Additional English)
+      // Exactly 3 unit cards: Poems (01), Lessons (02), Essays (03), plus Textbook (00)
       let lang2Idx = subjects.findIndex((s) =>
         s.name.toLowerCase().includes("language ii") ||
         s.name.toLowerCase().includes("language 2") ||
@@ -9725,15 +9204,95 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
         s.id.includes("lang2")
       );
 
+      const defaultLangOptions = [
+        { code: "kan", name: "Kannada" },
+        { code: "hin", name: "Hindi" },
+        { code: "ae", name: "Additional English" }
+      ];
+
+      const makeLangChildren = (langCode: string, langName: string, existingChildren?: Unit[]): Unit[] => {
+        const tbCard: Unit = existingChildren?.find(c => c.kind === "textbook" || c.name?.toLowerCase().includes("textbook")) || {
+          id: `${course.id}_${langCode}_s${semNum}_tb`,
+          number: "00",
+          name: "Textbook",
+          description: `${langName} Textbook`,
+          masteryPercent: 0,
+          status: "Locked",
+          kind: "textbook"
+        };
+
+        const ch1 = existingChildren?.find(c => c.number === "01" || c.id?.includes("ch1") || c.name?.toLowerCase().includes("poem"));
+        const ch2 = existingChildren?.find(c => c.number === "02" || c.id?.includes("ch2") || c.name?.toLowerCase().includes("lesson"));
+        const ch3 = existingChildren?.find(c => c.number === "03" || c.id?.includes("ch3") || c.name?.toLowerCase().includes("essay"));
+
+        const poemsCard: Unit = {
+          ...(ch1 || {}),
+          id: ch1?.id || `${course.id}_${langCode}_s${semNum}_poems`,
+          number: "01",
+          name: "Poems",
+          description: ch1?.description && !ch1.description.includes("Chapter") ? ch1.description : `${langName} Prescribed Poems & Literary Verses`,
+          masteryPercent: ch1?.masteryPercent || 0,
+          status: ch1?.status || "Locked",
+          kind: "chapter"
+        };
+
+        const lessonsCard: Unit = {
+          ...(ch2 || {}),
+          id: ch2?.id || `${course.id}_${langCode}_s${semNum}_lessons`,
+          number: "02",
+          name: "Lessons",
+          description: ch2?.description && !ch2.description.includes("Chapter") ? ch2.description : `${langName} Prescribed Lessons & Prose`,
+          masteryPercent: ch2?.masteryPercent || 0,
+          status: ch2?.status || "Locked",
+          kind: "chapter"
+        };
+
+        const essaysCard: Unit = {
+          ...(ch3 || {}),
+          id: ch3?.id || `${course.id}_${langCode}_s${semNum}_essays`,
+          number: "03",
+          name: "Essays",
+          description: ch3?.description && !ch3.description.includes("Chapter") ? ch3.description : `${langName} Prescribed Essays & Composition`,
+          masteryPercent: ch3?.masteryPercent || 0,
+          status: ch3?.status || "Locked",
+          kind: "chapter"
+        };
+
+        return [tbCard, poemsCard, lessonsCard, essaysCard];
+      };
+
       if (lang2Idx >= 0) {
+        const existingLang2 = subjects[lang2Idx];
+        const existingUnits = existingLang2.units || [];
+        
+        const updatedUnits: Unit[] = defaultLangOptions.map((opt, idx) => {
+          const foundUnit = existingUnits.find(u => 
+            u.name.toLowerCase().includes(opt.name.toLowerCase()) || 
+            u.id.includes(opt.code)
+          );
+
+          return {
+            id: foundUnit?.id || `${course.id}_lang2_s${semNum}_${opt.code}`,
+            number: foundUnit?.number || `0${idx + 1}`,
+            name: foundUnit?.name || opt.name,
+            description: foundUnit?.description || `${opt.name} textbook, poems, lessons, and essays.`,
+            masteryPercent: foundUnit?.masteryPercent || 0,
+            status: foundUnit?.status || "Locked",
+            kind: "language",
+            children: makeLangChildren(opt.code, opt.name, foundUnit?.children)
+          };
+        });
+
         subjects[lang2Idx] = {
-          ...subjects[lang2Idx],
+          ...existingLang2,
           name: "Language II",
           description: "Kannada, Hindi, or Additional English language options.",
           contentMode: "languages",
           icon: "Languages",
-          bgColor: subjects[lang2Idx].bgColor || "bg-purple-50 text-purple-800",
-          textColor: subjects[lang2Idx].textColor || "text-purple-800",
+          modulesCount: 3,
+          bgColor: existingLang2.bgColor || "bg-purple-50 text-purple-800",
+          textColor: existingLang2.textColor || "text-purple-800",
+          units: updatedUnits
         };
       } else {
         subjects.push({
@@ -9749,56 +9308,16 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
           progressPercent: 0,
           contentMode: "languages",
           textbooks: [],
-          units: [
-            {
-              id: `${course.id}_lang2_s${semNum}_kan`,
-              number: "01",
-              name: "Kannada",
-              description: "Kannada textbook and chapter materials.",
-              masteryPercent: 0,
-              status: "Locked",
-              kind: "language",
-              children: [
-                { id: `${course.id}_kan_s${semNum}_tb`, number: "00", name: "Textbook", description: "Kannada Textbook", masteryPercent: 0, status: "Locked", kind: "textbook" },
-                { id: `${course.id}_kan_s${semNum}_ch1`, number: "01", name: "Chapter 1", description: "Kannada Chapter 1", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_kan_s${semNum}_ch2`, number: "02", name: "Chapter 2", description: "Kannada Chapter 2", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_kan_s${semNum}_ch3`, number: "03", name: "Chapter 3", description: "Kannada Chapter 3", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_kan_s${semNum}_ch4`, number: "04", name: "Chapter 4", description: "Kannada Chapter 4", masteryPercent: 0, status: "Locked", kind: "chapter" }
-              ]
-            },
-            {
-              id: `${course.id}_lang2_s${semNum}_hin`,
-              number: "02",
-              name: "Hindi",
-              description: "Hindi textbook and chapter materials.",
-              masteryPercent: 0,
-              status: "Locked",
-              kind: "language",
-              children: [
-                { id: `${course.id}_hin_s${semNum}_tb`, number: "00", name: "Textbook", description: "Hindi Textbook", masteryPercent: 0, status: "Locked", kind: "textbook" },
-                { id: `${course.id}_hin_s${semNum}_ch1`, number: "01", name: "Chapter 1", description: "Hindi Chapter 1", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_hin_s${semNum}_ch2`, number: "02", name: "Chapter 2", description: "Hindi Chapter 2", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_hin_s${semNum}_ch3`, number: "03", name: "Chapter 3", description: "Hindi Chapter 3", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_hin_s${semNum}_ch4`, number: "04", name: "Chapter 4", description: "Hindi Chapter 4", masteryPercent: 0, status: "Locked", kind: "chapter" }
-              ]
-            },
-            {
-              id: `${course.id}_lang2_s${semNum}_ae`,
-              number: "03",
-              name: "Additional English",
-              description: "Additional English textbook and chapter materials.",
-              masteryPercent: 0,
-              status: "Locked",
-              kind: "language",
-              children: [
-                { id: `${course.id}_ae_s${semNum}_tb`, number: "00", name: "Textbook", description: "Additional English Textbook", masteryPercent: 0, status: "Locked", kind: "textbook" },
-                { id: `${course.id}_ae_s${semNum}_ch1`, number: "01", name: "Chapter 1", description: "Additional English Chapter 1", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_ae_s${semNum}_ch2`, number: "02", name: "Chapter 2", description: "Additional English Chapter 2", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_ae_s${semNum}_ch3`, number: "03", name: "Chapter 3", description: "Additional English Chapter 3", masteryPercent: 0, status: "Locked", kind: "chapter" },
-                { id: `${course.id}_ae_s${semNum}_ch4`, number: "04", name: "Chapter 4", description: "Additional English Chapter 4", masteryPercent: 0, status: "Locked", kind: "chapter" }
-              ]
-            }
-          ],
+          units: defaultLangOptions.map((opt, idx) => ({
+            id: `${course.id}_lang2_s${semNum}_${opt.code}`,
+            number: `0${idx + 1}`,
+            name: opt.name,
+            description: `${opt.name} textbook, poems, lessons, and essays.`,
+            masteryPercent: 0,
+            status: "Locked",
+            kind: "language",
+            children: makeLangChildren(opt.code, opt.name)
+          })),
           materials: []
         });
       }
@@ -9815,4 +9334,3 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
     };
   });
 }
-

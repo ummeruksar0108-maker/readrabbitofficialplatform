@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Course, Subject, Semester, Unit, StudyMaterial, AppNotification } from "../types";
+import { Course, Subject, Semester, Unit, StudyMaterial, AppNotification, StudentFeedback, FeedbackStatus } from "../types";
 import { uploadFileToSupabaseStorage, deleteFileFromSupabaseStorage, insertMaterialToSupabaseDB, deleteMaterialFromSupabase, supabase } from "../lib/supabase";
 import { 
   ShieldCheck, 
@@ -37,7 +37,15 @@ import {
   Key,
   Users,
   Send,
-  Zap
+  Zap,
+  MessageSquareHeart,
+  Star,
+  MessageSquare,
+  Check,
+  CornerDownRight,
+  GraduationCap,
+  Lightbulb,
+  Bug
 } from "lucide-react";
 
 interface AdminPortalProps {
@@ -50,6 +58,10 @@ interface AdminPortalProps {
   notifications?: AppNotification[];
   onDeleteNotification?: (id: string) => void;
   onClearAllNotifications?: () => void;
+  feedbackList?: StudentFeedback[];
+  onUpdateFeedbackStatus?: (id: string, status: FeedbackStatus, adminNote?: string) => Promise<void>;
+  onDeleteFeedback?: (id: string) => Promise<void>;
+  onClearAllFeedback?: () => Promise<void>;
 }
 
 export default function AdminPortal({
@@ -62,6 +74,10 @@ export default function AdminPortal({
   notifications = [],
   onDeleteNotification,
   onClearAllNotifications,
+  feedbackList = [],
+  onUpdateFeedbackStatus,
+  onDeleteFeedback,
+  onClearAllFeedback,
 }: AdminPortalProps) {
   // Login fields
   const [email, setEmail] = useState(() => (import.meta.env.VITE_ADMIN_EMAIL as string) || "thecodeorbitoffi@gmail.com");
@@ -70,8 +86,8 @@ export default function AdminPortal({
   const [loginError, setLoginError] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
-  // Admin Dashboard main tab state: 'curriculum' | 'uploads' | 'sync' | 'semesters' | 'notifications' | 'security'
-  const [activeAdminTab, setActiveAdminTab] = useState<"curriculum" | "uploads" | "sync" | "semesters" | "notifications" | "security">("curriculum");
+  // Admin Dashboard main tab state: 'curriculum' | 'uploads' | 'sync' | 'semesters' | 'notifications' | 'feedback' | 'security'
+  const [activeAdminTab, setActiveAdminTab] = useState<"curriculum" | "uploads" | "sync" | "semesters" | "notifications" | "feedback" | "security">("curriculum");
 
   // Admin Uploads Directory States
   const [uploadSearch, setUploadSearch] = useState("");
@@ -961,6 +977,114 @@ export default function AdminPortal({
     setSecuritySuccess("Administrator password updated successfully! 🥕");
   };
 
+  // Feedback Tab States
+  const [feedbackSearch, setFeedbackSearch] = useState("");
+  const [feedbackCategoryFilter, setFeedbackCategoryFilter] = useState("all");
+  const [feedbackRatingFilter, setFeedbackRatingFilter] = useState("all");
+  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState("all");
+  const [editingAdminNoteId, setEditingAdminNoteId] = useState<string | null>(null);
+  const [adminNoteInput, setAdminNoteInput] = useState("");
+  const [isUpdatingFeedback, setIsUpdatingFeedback] = useState<string | null>(null);
+
+  // Derived feedback metrics
+  const unreadFeedbackCount = React.useMemo(() => {
+    return feedbackList.filter(f => f.status === "unread").length;
+  }, [feedbackList]);
+
+  const averageRating = React.useMemo(() => {
+    if (feedbackList.length === 0) return "5.0";
+    const sum = feedbackList.reduce((acc, f) => acc + (f.rating || 5), 0);
+    return (sum / feedbackList.length).toFixed(1);
+  }, [feedbackList]);
+
+  const materialsRequestsCount = React.useMemo(() => {
+    return feedbackList.filter(f => f.category === "materials").length;
+  }, [feedbackList]);
+
+  // Filtered feedback items
+  const filteredFeedbackList = React.useMemo(() => {
+    return feedbackList.filter(item => {
+      // Category filter
+      if (feedbackCategoryFilter !== "all" && item.category !== feedbackCategoryFilter) {
+        return false;
+      }
+      // Rating filter
+      if (feedbackRatingFilter !== "all" && String(item.rating) !== feedbackRatingFilter) {
+        return false;
+      }
+      // Status filter
+      if (feedbackStatusFilter !== "all" && item.status !== feedbackStatusFilter) {
+        return false;
+      }
+      // Search query
+      if (feedbackSearch.trim()) {
+        const q = feedbackSearch.toLowerCase();
+        const matchesName = (item.studentName || "").toLowerCase().includes(q);
+        const matchesEmail = (item.studentEmail || "").toLowerCase().includes(q);
+        const matchesMessage = (item.message || "").toLowerCase().includes(q);
+        const matchesCourse = (item.courseName || "").toLowerCase().includes(q);
+        const matchesNote = (item.adminNote || "").toLowerCase().includes(q);
+        if (!matchesName && !matchesEmail && !matchesMessage && !matchesCourse && !matchesNote) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [feedbackList, feedbackCategoryFilter, feedbackRatingFilter, feedbackStatusFilter, feedbackSearch]);
+
+  // Status toggle handler
+  const handleStatusChange = async (id: string, newStatus: FeedbackStatus) => {
+    if (!onUpdateFeedbackStatus) return;
+    setIsUpdatingFeedback(id);
+    try {
+      const item = feedbackList.find(f => f.id === id);
+      await onUpdateFeedbackStatus(id, newStatus, item?.adminNote);
+    } catch (e) {
+      console.warn("Failed updating feedback status:", e);
+    } finally {
+      setIsUpdatingFeedback(null);
+    }
+  };
+
+  // Save admin note
+  const handleSaveAdminNote = async (id: string) => {
+    if (!onUpdateFeedbackStatus) return;
+    setIsUpdatingFeedback(id);
+    try {
+      const item = feedbackList.find(f => f.id === id);
+      await onUpdateFeedbackStatus(id, item?.status || "reviewed", adminNoteInput.trim());
+      setEditingAdminNoteId(null);
+      setAdminNoteInput("");
+    } catch (e) {
+      console.warn("Failed saving admin note:", e);
+    } finally {
+      setIsUpdatingFeedback(null);
+    }
+  };
+
+  // Delete feedback item
+  const handleDeleteFeedbackItem = async (id: string) => {
+    if (!window.confirm("Are you sure you want to permanently delete this student feedback entry?")) return;
+    if (onDeleteFeedback) {
+      await onDeleteFeedback(id);
+    }
+  };
+
+  // Export Feedback to JSON / CSV
+  const handleExportFeedback = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(feedbackList, null, 2));
+      const downloadAnchor = document.createElement("a");
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `read_rabbit_student_feedback_${Date.now()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (e) {
+      alert("Failed to export feedback: " + e);
+    }
+  };
+
   return (
     <div className="flex-1 min-h-screen px-4 md:px-8 py-8 pb-32 text-[#231a0a] font-sans">
       {/* Login Screen if not Admin */}
@@ -1101,6 +1225,7 @@ export default function AdminPortal({
               { id: "sync", label: "Cross-Device Sync & Backup", icon: RefreshCw },
               { id: "semesters", label: "Manage Semesters", icon: Layers },
               { id: "notifications", label: "Dispatch Board", icon: Bell },
+              { id: "feedback", label: "Student Feedback", icon: MessageSquareHeart, badge: unreadFeedbackCount },
               { id: "security", label: "Credentials Settings", icon: Settings },
             ].map((tab) => {
               const isActive = activeAdminTab === tab.id;
@@ -1109,14 +1234,19 @@ export default function AdminPortal({
                 <button
                   key={tab.id}
                   onClick={() => setActiveAdminTab(tab.id as any)}
-                  className={`py-3 px-5 font-bold text-xs transition-all border-b-2 cursor-pointer flex items-center gap-2 ${
+                  className={`py-3 px-5 font-bold text-xs transition-all border-b-2 cursor-pointer flex items-center gap-2 relative ${
                     isActive
                       ? "border-[#40010d] text-[#40010d]"
                       : "border-transparent text-[#544243] hover:text-[#231a0a]"
                   }`}
                 >
                   <Icon size={14} className={isActive ? "text-[#95491a]" : "text-[#877272]"} />
-                  {tab.label}
+                  <span>{tab.label}</span>
+                  {Boolean(tab.badge && tab.badge > 0) && (
+                    <span className="ml-1 px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-extrabold shadow-2xs animate-pulse">
+                      {tab.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -2405,6 +2535,393 @@ export default function AdminPortal({
                   Change Admin Password
                 </button>
               </form>
+            </div>
+          )}
+
+          {/* STUDENT FEEDBACK & COURSE REQUESTS VIEW */}
+          {activeAdminTab === "feedback" && (
+            <div className="space-y-6">
+              
+              {/* Top Banner & Metrics */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl border border-[#dac1c1]/20 shadow-xs">
+                <div>
+                  <h3 className="text-lg font-extrabold text-[#40010d] flex items-center gap-2">
+                    <MessageSquareHeart size={22} className="text-[#fd9b65]" /> Student Experience & Feedback Hub
+                  </h3>
+                  <p className="text-xs text-[#735E55] mt-1">
+                    Real-time student feedback, course suggestions, notes requests, and learning experience ratings.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleExportFeedback}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#FAF3E0] hover:bg-[#e8dbce] text-[#40010d] text-xs font-bold rounded-xl border border-[#dac1c1]/40 transition-all cursor-pointer shadow-2xs"
+                    title="Export all student feedback to JSON file"
+                  >
+                    <Download size={14} />
+                    <span>Export Feedback Data</span>
+                  </button>
+
+                  {onClearAllFeedback && feedbackList.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (confirm("Are you sure you want to clear all student feedback records?")) {
+                          await onClearAllFeedback();
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                      title="Clear feedback history"
+                    >
+                      <Trash2 size={13} />
+                      <span className="hidden sm:inline">Clear All</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 4 Stat Overview Metric Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white p-4.5 rounded-2xl border border-[#dac1c1]/20 shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-[#877272] uppercase tracking-wider">Total Submissions</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-extrabold text-[#40010d]">{feedbackList.length}</span>
+                    <span className="text-[11px] text-[#877272]">reviews</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4.5 rounded-2xl border border-[#dac1c1]/20 shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-[#877272] uppercase tracking-wider">Average Rating</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-extrabold text-amber-500">{averageRating}</span>
+                    <div className="flex items-center text-amber-400">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star key={s} size={12} className="fill-amber-400" />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4.5 rounded-2xl border border-[#dac1c1]/20 shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-[#877272] uppercase tracking-wider">Unread / New</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-extrabold text-rose-600">{unreadFeedbackCount}</span>
+                    <span className="text-[11px] text-rose-500 font-bold">need review</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4.5 rounded-2xl border border-[#dac1c1]/20 shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-[#877272] uppercase tracking-wider">Study Material Requests</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-extrabold text-[#95491a]">{materialsRequestsCount}</span>
+                    <span className="text-[11px] text-[#877272]">requests</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filters and Search Toolbar */}
+              <div className="bg-white p-4 rounded-2xl border border-[#dac1c1]/20 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                <div className="relative flex-1">
+                  <Search size={15} className="absolute left-3 top-3 text-[#877272]" />
+                  <input
+                    type="text"
+                    value={feedbackSearch}
+                    onChange={(e) => setFeedbackSearch(e.target.value)}
+                    placeholder="Search by student name, email, course, message, or notes..."
+                    className="w-full pl-9 pr-3 py-2 bg-[#fff8f3]/60 border border-[#dac1c1] focus:border-[#fd9b65] focus:bg-white rounded-xl text-xs focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Category Filter */}
+                  <select
+                    value={feedbackCategoryFilter}
+                    onChange={(e) => setFeedbackCategoryFilter(e.target.value)}
+                    className="bg-[#fff8f3]/60 border border-[#dac1c1] focus:border-[#fd9b65] rounded-xl px-3 py-2 text-xs font-bold text-[#40010d] focus:outline-none"
+                  >
+                    <option value="all">All Categories</option>
+                    <option value="experience">Study Experience</option>
+                    <option value="materials">Notes & PYQ Request</option>
+                    <option value="suggestion">Idea & Suggestion</option>
+                    <option value="bug">Reported Issue</option>
+                    <option value="other">General Feedback</option>
+                  </select>
+
+                  {/* Status Filter */}
+                  <select
+                    value={feedbackStatusFilter}
+                    onChange={(e) => setFeedbackStatusFilter(e.target.value)}
+                    className="bg-[#fff8f3]/60 border border-[#dac1c1] focus:border-[#fd9b65] rounded-xl px-3 py-2 text-xs font-bold text-[#40010d] focus:outline-none"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="unread">Unread ({unreadFeedbackCount})</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="resolved">Resolved</option>
+                  </select>
+
+                  {/* Rating Filter */}
+                  <select
+                    value={feedbackRatingFilter}
+                    onChange={(e) => setFeedbackRatingFilter(e.target.value)}
+                    className="bg-[#fff8f3]/60 border border-[#dac1c1] focus:border-[#fd9b65] rounded-xl px-3 py-2 text-xs font-bold text-[#40010d] focus:outline-none"
+                  >
+                    <option value="all">All Ratings</option>
+                    <option value="5">5 Stars ⭐</option>
+                    <option value="4">4 Stars ⭐</option>
+                    <option value="3">3 Stars ⭐</option>
+                    <option value="2">2 Stars ⭐</option>
+                    <option value="1">1 Star ⭐</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Feedback Item Cards */}
+              <div className="space-y-3.5">
+                {filteredFeedbackList.length === 0 ? (
+                  <div className="bg-white rounded-3xl p-12 text-center border border-[#dac1c1]/20 shadow-2xs space-y-3">
+                    <div className="w-14 h-14 bg-[#FAF3E0] text-[#95491a] rounded-2xl mx-auto flex items-center justify-center">
+                      <MessageSquareHeart size={28} />
+                    </div>
+                    <h4 className="text-base font-extrabold text-[#40010d]">No Feedback Found</h4>
+                    <p className="text-xs text-[#735E55] max-w-sm mx-auto">
+                      {feedbackSearch || feedbackCategoryFilter !== "all" || feedbackStatusFilter !== "all"
+                        ? "No student feedback matches your active search and filter criteria."
+                        : "No student feedback submitted yet. Feedback submitted by students in the header will appear here in real-time."}
+                    </p>
+                  </div>
+                ) : (
+                  filteredFeedbackList.map((item) => {
+                    const isUnread = item.status === "unread";
+                    const isResolved = item.status === "resolved";
+                    const isEditingThisNote = editingAdminNoteId === item.id;
+                    const isUpdating = isUpdatingFeedback === item.id;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`bg-white rounded-2xl border transition-all p-5 shadow-2xs space-y-3.5 text-left ${
+                          isUnread
+                            ? "border-orange-300 ring-1 ring-orange-200/50 bg-[#fffdfb]"
+                            : isResolved
+                            ? "border-emerald-200/70"
+                            : "border-[#dac1c1]/30 hover:border-[#fd9b65]/60"
+                        }`}
+                      >
+                        {/* Header Row */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <span className="font-extrabold text-xs text-[#40010d]">
+                              {item.studentName || "Anonymous Student"}
+                            </span>
+
+                            {item.studentEmail && (
+                              <span className="text-[11px] text-[#735E55] bg-gray-100 px-2 py-0.5 rounded-md font-mono flex items-center gap-1">
+                                <Mail size={11} /> {item.studentEmail}
+                              </span>
+                            )}
+
+                            {item.courseName && (
+                              <span className="text-[10px] font-bold text-[#95491a] bg-[#FAF3E0] px-2 py-0.5 rounded-md border border-[#dac1c1]/30">
+                                {item.courseName} {item.semesterName ? `• ${item.semesterName}` : ""}
+                              </span>
+                            )}
+
+                            <span className="text-[10px] text-[#877272]">
+                              {item.timestamp || new Date(item.createdAt || Date.now()).toLocaleDateString()}
+                            </span>
+                          </div>
+
+                          {/* Status Badge & Rating */}
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3, 4, 5].map((s) => (
+                                <Star
+                                  key={s}
+                                  size={13}
+                                  className={s <= (item.rating || 5) ? "fill-amber-400 text-amber-400" : "text-gray-200"}
+                                />
+                              ))}
+                              <span className="text-xs font-extrabold text-[#40010d] ml-1">
+                                {item.rating || 5}/5
+                              </span>
+                            </div>
+
+                            <span
+                              className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                                isUnread
+                                  ? "bg-rose-100 text-rose-700 border border-rose-200 animate-pulse"
+                                  : isResolved
+                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                  : "bg-blue-100 text-blue-800 border border-blue-200"
+                              }`}
+                            >
+                              {item.status || "unread"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Category Label */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#95491a] bg-[#fff2e1] px-2 py-0.5 rounded-md border border-[#dac1c1]/40 flex items-center gap-1">
+                            {item.category === "materials" && <BookOpen size={10} />}
+                            {item.category === "suggestion" && <Lightbulb size={10} />}
+                            {item.category === "bug" && <Bug size={10} />}
+                            {item.category === "experience" && <Sparkles size={10} />}
+                            {item.category === "other" && <MessageSquare size={10} />}
+                            {item.category === "materials"
+                              ? "Notes / PYQ Request"
+                              : item.category === "suggestion"
+                              ? "Feature Suggestion"
+                              : item.category === "bug"
+                              ? "Bug Report"
+                              : item.category === "experience"
+                              ? "Study Experience"
+                              : "General Feedback"}
+                          </span>
+                        </div>
+
+                        {/* Student's Message Content */}
+                        <div className="bg-[#FAF3E0]/30 rounded-xl p-3.5 border border-[#dac1c1]/30 text-xs text-[#231a0a] leading-relaxed whitespace-pre-wrap font-sans">
+                          {item.message}
+                        </div>
+
+                        {/* Admin Notes Section */}
+                        {item.adminNote && !isEditingThisNote && (
+                          <div className="bg-amber-50/50 rounded-xl p-3 border border-amber-200/50 text-xs text-amber-900 space-y-1 flex items-start justify-between gap-3">
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 flex items-center gap-1">
+                                <CornerDownRight size={12} /> Administrator Internal Note:
+                              </span>
+                              <p className="leading-relaxed">{item.adminNote}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingAdminNoteId(item.id);
+                                setAdminNoteInput(item.adminNote || "");
+                              }}
+                              className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline shrink-0 cursor-pointer"
+                            >
+                              Edit Note
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Inline Admin Note Editor */}
+                        {isEditingThisNote && (
+                          <div className="bg-white rounded-xl p-3 border border-[#fd9b65] space-y-2">
+                            <label className="text-[10px] font-bold text-[#877272] uppercase tracking-wider">
+                              Admin Resolution / Internal Note:
+                            </label>
+                            <input
+                              type="text"
+                              value={adminNoteInput}
+                              onChange={(e) => setAdminNoteInput(e.target.value)}
+                              placeholder="e.g. Added 2023 PYQs to Semester 3 Computer Networks unit folder."
+                              className="w-full bg-[#fff8f3]/60 border border-[#dac1c1] rounded-xl px-3 py-2 text-xs focus:outline-none"
+                            />
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setEditingAdminNoteId(null)}
+                                className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700 cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveAdminNote(item.id)}
+                                disabled={isUpdating}
+                                className="px-3 py-1 bg-[#40010d] text-white text-xs font-bold rounded-lg cursor-pointer"
+                              >
+                                {isUpdating ? "Saving..." : "Save Note"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Action Bar */}
+                        <div className="pt-2 border-t border-[#dac1c1]/20 flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            {item.status !== "reviewed" && (
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(item.id, "reviewed")}
+                                disabled={isUpdating}
+                                className="px-3 py-1.5 bg-[#FAF3E0] hover:bg-[#e8dbce] text-[#40010d] text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <Check size={13} />
+                                <span>Mark Reviewed</span>
+                              </button>
+                            )}
+
+                            {item.status !== "resolved" && (
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(item.id, "resolved")}
+                                disabled={isUpdating}
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                              >
+                                <CheckCircle size={13} />
+                                <span>Mark Resolved</span>
+                              </button>
+                            )}
+
+                            {item.status !== "unread" && (
+                              <button
+                                type="button"
+                                onClick={() => handleStatusChange(item.id, "unread")}
+                                disabled={isUpdating}
+                                className="px-2.5 py-1.5 text-gray-500 hover:text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-100 transition-all cursor-pointer"
+                              >
+                                <span>Mark as Unread</span>
+                              </button>
+                            )}
+
+                            {!item.adminNote && !isEditingThisNote && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingAdminNoteId(item.id);
+                                  setAdminNoteInput("");
+                                }}
+                                className="px-2.5 py-1.5 text-[#95491a] hover:text-[#40010d] text-xs font-bold rounded-xl hover:bg-[#FAF3E0] transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <Plus size={13} />
+                                <span>Add Admin Note</span>
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {item.studentEmail && (
+                              <a
+                                href={`mailto:${item.studentEmail}?subject=${encodeURIComponent("Re: Read Rabbit Feedback - " + (item.category || "General"))}&body=${encodeURIComponent("Hi " + (item.studentName || "there") + ",\n\nThank you for reaching out with your feedback regarding:\n\"" + item.message + "\"\n\n")}`}
+                                className="px-3 py-1.5 bg-white hover:bg-gray-50 text-[#40010d] text-xs font-bold rounded-xl border border-[#dac1c1]/40 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                title="Reply directly via email"
+                              >
+                                <Mail size={13} className="text-[#95491a]" />
+                                <span>Reply</span>
+                              </a>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteFeedbackItem(item.id)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                              title="Delete feedback"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           )}
 

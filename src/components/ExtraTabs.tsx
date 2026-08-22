@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { StudyMaterial } from "../types";
-import { Book, Bookmark, Settings, Check, User, Target, Compass, Sparkles, Sliders, Palette } from "lucide-react";
+import { Book, Bookmark, Settings, Check, User, Mail, Target, Compass, Sparkles, Sliders, Palette } from "lucide-react";
 
 // Types for ExtraTabs
 interface ExtraTabsProps {
@@ -8,6 +8,8 @@ interface ExtraTabsProps {
   onNavigateToSyllabus: () => void;
   studentName: string;
   setStudentName: (name: string) => void;
+  studentEmail?: string;
+  setStudentEmail?: (email: string) => void;
   bgColor?: string;
   setBgColor?: (color: string) => void;
 }
@@ -29,10 +31,13 @@ export default function ExtraTabs({
   onNavigateToSyllabus,
   studentName,
   setStudentName,
+  studentEmail = "",
+  setStudentEmail,
   bgColor = "#FAF3E0",
   setBgColor,
 }: ExtraTabsProps) {
   const [localName, setLocalName] = useState(studentName);
+  const [localEmail, setLocalEmail] = useState(studentEmail);
   const [studyGoal, setStudyGoal] = useState("2 Hours");
   const [activeMood, setActiveMood] = useState("Focus Burrow");
   const [isSaved, setIsSaved] = useState(false);
@@ -40,10 +45,15 @@ export default function ExtraTabs({
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     setStudentName(localName);
+    if (setStudentEmail) {
+      setStudentEmail(localEmail);
+    }
+    localStorage.setItem("read_rabbit_student_name", localName);
+    localStorage.setItem("read_rabbit_student_email", localEmail);
     setIsSaved(true);
     setTimeout(() => {
       setIsSaved(false);
-    }, 2000);
+    }, 2500);
   };
 
   if (activeTab === "library") {
@@ -139,15 +149,38 @@ export default function ExtraTabs({
               <h3 className="font-bold text-[#40010d] text-sm tracking-wider uppercase">Burrow Profile</h3>
             </div>
             
-            <div>
-              <label className="block text-xs font-bold text-[#544243] mb-2">STUDY COMPANION NAME</label>
-              <input
-                type="text"
-                value={localName}
-                onChange={(e) => setLocalName(e.target.value)}
-                className="w-full bg-[#fff8f3]/50 px-4 py-3 rounded-xl border border-[#dac1c1] focus:outline-none focus:border-[#fd9b65] text-sm"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-[#544243] mb-1.5 uppercase">STUDENT NAME</label>
+                <div className="relative">
+                  <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#877272]" />
+                  <input
+                    type="text"
+                    value={localName}
+                    onChange={(e) => setLocalName(e.target.value)}
+                    placeholder="Your Name"
+                    className="w-full bg-[#fff8f3]/50 pl-10 pr-4 py-3 rounded-xl border border-[#dac1c1] focus:outline-none focus:border-[#fd9b65] text-sm font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#544243] mb-1.5 uppercase">EMAIL ADDRESS</label>
+                <div className="relative">
+                  <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#877272]" />
+                  <input
+                    type="email"
+                    value={localEmail}
+                    onChange={(e) => setLocalEmail(e.target.value)}
+                    placeholder="student@example.com"
+                    className="w-full bg-[#fff8f3]/50 pl-10 pr-4 py-3 rounded-xl border border-[#dac1c1] focus:outline-none focus:border-[#fd9b65] text-sm font-medium"
+                  />
+                </div>
+              </div>
             </div>
+            <p className="text-[11px] text-[#877272]">
+              Permanently saved to your device. Used to personalize your study notes, feedback submissions, and senior question paper requests.
+            </p>
           </div>
 
           {/* Goals */}
