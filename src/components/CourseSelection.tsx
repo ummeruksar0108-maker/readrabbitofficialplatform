@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Course } from "../types";
-import { Brain, Database, BookOpen, ShieldCheck } from "lucide-react";
+import { Brain, Database, BookOpen, ShieldCheck, ArrowLeft, Sparkles, Layers } from "lucide-react";
 import { Logo } from "./Logo";
 
 interface CourseSelectionProps {
@@ -10,6 +10,9 @@ interface CourseSelectionProps {
   onOpenAdminPortal: () => void;
   isAdmin: boolean;
   onSecretTrigger?: () => void;
+  isOnboarding?: boolean;
+  onBack?: () => void;
+  studentName?: string;
 }
 
 export default function CourseSelection({
@@ -18,6 +21,9 @@ export default function CourseSelection({
   onOpenAdminPortal,
   isAdmin,
   onSecretTrigger,
+  isOnboarding = false,
+  onBack,
+  studentName,
 }: CourseSelectionProps) {
   const [logoClicks, setLogoClicks] = useState(0);
 
@@ -35,15 +41,43 @@ export default function CourseSelection({
     }
   };
 
+  const hasName = Boolean(studentName && studentName.trim() && studentName !== "Little Bunny");
+
   return (
-    <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden">
+    <div
+      id="course-selection-page"
+      className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden text-left"
+    >
       {/* Ambient background blur circles */}
       <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-[#D97706]/10 rounded-full filter blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-[#1E1412]/5 rounded-full filter blur-3xl pointer-events-none"></div>
 
-      <div className="max-w-4xl w-full text-center z-10 space-y-10">
+      <div className="max-w-4xl w-full text-center z-10 space-y-8">
+        {/* Navigation & Step Indicator (if in onboarding or onBack provided) */}
+        <div className="flex items-center justify-between">
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#735E55] hover:text-[#1E1412] px-3 py-1.5 rounded-xl hover:bg-[#F4ECE1] transition-colors cursor-pointer"
+            >
+              <ArrowLeft size={14} className="text-[#D97706]" />
+              <span>{isOnboarding ? "Back to Student Info" : "Back"}</span>
+            </button>
+          ) : (
+            <div></div>
+          )}
+
+          {isOnboarding && (
+            <div className="inline-flex items-center gap-1.5 bg-[#F4ECE1] text-[#95491a] px-3 py-1 rounded-full text-xs font-extrabold border border-[#E2D4C3]">
+              <span>Step 2 of 2</span>
+              <span className="text-[#735E55] font-normal">• Specialization Selection</span>
+            </div>
+          )}
+        </div>
+
         {/* Read Rabbit Logo Header */}
-        <div className="flex flex-col items-center space-y-3">
+        <div className="flex flex-col items-center space-y-2">
           <div 
             onClick={handleLogoClick}
             className="hover:scale-105 transition-transform duration-300 cursor-pointer"
@@ -62,19 +96,20 @@ export default function CourseSelection({
         </div>
 
         {/* Course Intro */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           <h2 className="font-sans text-3xl md:text-4xl font-extrabold text-[#1E1412]">
-            Select Your Specialization
+            {hasName ? `${studentName}, Select Your Specialization` : "Select Your Specialization"}
           </h2>
           <p className="text-[#2A1C18] text-sm md:text-base max-w-xl mx-auto leading-relaxed">
-            Welcome back to the burrow! Select your registered undergraduate program to load your customized subjects, syllabus units, and active study materials.
+            Choose your undergraduate degree program. We'll automatically load that course's semester roadmap, syllabus modules, notes, and previous year question papers.
           </p>
         </div>
 
         {/* Course Options Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
           {courses.map((course, index) => {
             const isAIML = course.id === "aiml";
+            const isDS = course.id === "ds";
 
             return (
               <motion.div
@@ -83,30 +118,40 @@ export default function CourseSelection({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1, duration: 0.5 }}
                 onClick={() => onSelectCourse(course.id)}
-                className="group bg-white rounded-3xl p-6 border border-[#E2D4C3] shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 cursor-pointer text-left flex flex-col justify-between relative overflow-hidden"
+                className="group bg-white rounded-3xl p-6 border-2 border-[#E2D4C3] shadow-sm hover:border-[#D97706] hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 cursor-pointer text-left flex flex-col justify-between relative overflow-hidden"
               >
-                {/* Visual Accent */}
+                {/* Visual Accent Badge */}
                 {isAIML && (
                   <span className="absolute top-4 right-4 bg-[#D97706] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
-                    BCA Specialization
+                    Specialization
+                  </span>
+                )}
+                {isDS && (
+                  <span className="absolute top-4 right-4 bg-[#6b8a80] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
+                    Analytics
                   </span>
                 )}
 
                 <div>
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 bg-[#F4ECE1] text-[#D97706]">
-                    {isAIML ? <Brain size={24} /> : course.id === "ds" ? <Database size={24} /> : <BookOpen size={24} />}
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 bg-[#F4ECE1] text-[#D97706] group-hover:bg-[#1E1412] group-hover:text-[#FEF3C7] transition-colors">
+                    {isAIML ? <Brain size={24} /> : isDS ? <Database size={24} /> : <BookOpen size={24} />}
                   </div>
 
                   <h3 className="font-sans text-xl font-bold text-[#1E1412] group-hover:text-[#D97706] transition-colors">
                     {course.name}
                   </h3>
-                  <p className="text-[#2A1C18] text-xs font-sans mt-3 leading-relaxed min-h-[50px]">
+                  <p className="text-[#2A1C18] text-xs font-sans mt-3 leading-relaxed min-h-[48px]">
                     {course.description}
                   </p>
+
+                  <div className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold text-[#735E55]">
+                    <Layers size={13} className="text-[#D97706]" />
+                    <span>{course.semesters?.length || 6} Semesters Syllabus & PYQs</span>
+                  </div>
                 </div>
 
-                <div className="pt-6 mt-6 border-t border-[#E2D4C3] flex items-center justify-between text-[#D97706] font-sans text-xs font-bold group-hover:text-[#1E1412] transition-colors">
-                  <span>Explore Semesters</span>
+                <div className="pt-5 mt-5 border-t border-[#E2D4C3] flex items-center justify-between text-[#D97706] font-sans text-xs font-bold group-hover:text-[#1E1412] transition-colors">
+                  <span>Explore Semester Roadmap</span>
                   <span className="group-hover:translate-x-1.5 transition-transform">→</span>
                 </div>
               </motion.div>
@@ -116,7 +161,7 @@ export default function CourseSelection({
 
         {/* Footer info tag with small admin portal option */}
         <div className="pt-6 border-t border-[#E2D4C3] flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-sans text-[#735E55]">
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 text-center sm:text-left">
             <span>Read Rabbit Academic Portal © 2026. All study resources are peer-certified.</span>
             <span className="text-[#D97706] font-medium">
               Created with ☕ & 🍯 by <strong className="text-[#1E1412]">Umme Ruksar</strong> &{" "}

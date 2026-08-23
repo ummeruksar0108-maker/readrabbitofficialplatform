@@ -1,12 +1,12 @@
 import { motion } from "motion/react";
 import { Course, Semester } from "../types";
-import { BookOpen, Edit3, Lock, ChevronRight, HelpCircle, ShieldCheck } from "lucide-react";
+import { BookOpen, Edit3, Lock, ChevronRight, ShieldCheck } from "lucide-react";
 
 interface CurriculumRoadmapProps {
   courses: Course[];
   activeCourseId: string | null;
   onSelectSemester: (courseId: string, semesterId: number) => void;
-  onShowPrereqs: (semesterName: string) => void;
+  onShowPrereqs?: (semesterName: string) => void;
   onUnlockAll?: () => void;
   onOpenAdminPortal?: () => void;
 }
@@ -107,24 +107,9 @@ export default function CurriculumRoadmap({ courses, activeCourseId, onSelectSem
                       <h4 className={`font-sans text-lg font-bold text-[#1E1412] mb-2 ${isLocked ? "opacity-60" : ""}`}>
                         {semester.name}
                       </h4>
-                      <p className={`text-[#2A1C18] text-xs font-sans mb-6 ${isLocked ? "opacity-50" : ""}`}>
+                      <p className={`text-[#2A1C18] text-xs font-sans ${isLocked ? "opacity-50" : ""}`}>
                         {semester.description}
                       </p>
-
-                      {/* Prerequisites if locked */}
-                      {isLocked && (
-                        <div className="mt-auto">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onShowPrereqs(semester.name);
-                            }}
-                            className="text-[#1E1412] hover:text-[#D97706] font-sans text-xs font-bold flex items-center gap-1 group-hover:gap-2 transition-all cursor-pointer"
-                          >
-                            View Prerequisites <HelpCircle size={14} />
-                          </button>
-                        </div>
-                      )}
                     </motion.div>
                   );
                 })}

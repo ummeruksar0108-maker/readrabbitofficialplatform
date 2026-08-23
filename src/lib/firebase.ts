@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, getDocFromServer, onSnapshot } from "firebase/firestore";
+import { initializeFirestore, getFirestore, doc, setDoc, getDoc, onSnapshot, Firestore } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { uploadFileToSupabaseStorage } from "./supabase";
 import config from "../../firebase-applet-config.json";
@@ -7,14 +7,25 @@ import config from "../../firebase-applet-config.json";
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(config) : getApp();
 
-// Initialize Firestore Database using the specific databaseId from config if provided
+// Initialize Firestore Database with forced long-polling to ensure stable connectivity in sandboxed/iframe web environments
 const targetDbId = config.firestoreDatabaseId && config.firestoreDatabaseId !== "(default)"
   ? config.firestoreDatabaseId
   : "(default)";
 
-export const db = targetDbId !== "(default)"
-  ? getFirestore(app, targetDbId)
-  : getFirestore(app);
+export const db: Firestore = (() => {
+  try {
+    return initializeFirestore(
+      app,
+      {
+        experimentalForceLongPolling: true,
+        ignoreUndefinedProperties: true
+      },
+      targetDbId !== "(default)" ? targetDbId : undefined
+    );
+  } catch (e) {
+    return targetDbId !== "(default)" ? getFirestore(app, targetDbId) : getFirestore(app);
+  }
+})();
 
 // Initialize Firebase Storage with explicit bucket URL
 const storageBucketName = config.storageBucket || "solid-aquifer-j5fd2.firebasestorage.app";
@@ -154,21 +165,6 @@ let firestoreQuotaExceededUntil = 0;
 let lastSavedCoursesPayload = "";
 
 /**
- * Validates connection to Firestore on initial boot.
- */
-async function testFirestoreConnection() {
-  try {
-    await getDocFromServer(doc(db, "courses", "main"));
-    logDiagnostic("success", "[Firestore Boot] Verified active connection to Firestore cloud!");
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("the client is offline")) {
-      console.warn("[Firestore Boot] Client is offline or Firestore config needs verification.");
-    }
-  }
-}
-testFirestoreConnection();
-
-/**
  * Error handler helper for Firestore operations.
  */
 export enum FirestoreOperationType {
@@ -269,22 +265,28 @@ export async function loadCoursesFromFirestore(): Promise<any[] | null> {
   logDiagnostic("info", "Loading curriculum from Firestore 'courses/main'...");
   try {
     const courseDocRef = doc(db, "courses", "main");
-    const docSnap = await getDoc(courseDocRef);
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      if (data && Array.isArray(data.coursesData) && data.coursesData.length > 0) {
-        updateDiagnostics({
-          readStatus: "SUCCESS",
-          readSource: "Firestore Direct Fetch",
-          readDocPath: "courses/main",
-          readCourseCount: data.coursesData.length,
-          lastReadTime: new Date().toLocaleTimeString(),
-          readError: null
-        });
-        logDiagnostic("success", `[Firestore Cloud] Loaded ${data.coursesData.length} courses from 'courses/main'!`);
-        return data.coursesData;
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+    const fetchPromise = (async () => {
+      const docSnap = await getDoc(courseDocRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && Array.isArray(data.coursesData) && data.coursesData.length > 0) {
+          updateDiagnostics({
+            readStatus: "SUCCESS",
+            readSource: "Firestore Direct Fetch",
+            readDocPath: "courses/main",
+            readCourseCount: data.coursesData.length,
+            lastReadTime: new Date().toLocaleTimeString(),
+            readError: null
+          });
+          logDiagnostic("success", `[Firestore Cloud] Loaded ${data.coursesData.length} courses from 'courses/main'!`);
+          return data.coursesData;
+        }
       }
-    }
+      return null;
+    })();
+
+    return await Promise.race([fetchPromise, timeoutPromise]);
   } catch (err: any) {
     const errMsg = err?.message || String(err);
     updateDiagnostics({

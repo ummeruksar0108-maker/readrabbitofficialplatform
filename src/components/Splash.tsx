@@ -1,31 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { BookOpen, Award, Zap, ArrowRight, Compass, User, Mail, Sparkles, CheckCircle2, ArrowUpRight } from "lucide-react";
+import { motion } from "motion/react";
+import { BookOpen, Award, Zap, ArrowRight, Compass } from "lucide-react";
 import { Logo } from "./Logo";
 
 interface SplashProps {
-  onEnter: (name?: string, email?: string) => void;
-  savedName?: string;
-  savedEmail?: string;
+  onEnter: () => void;
 }
 
-export default function Splash({ onEnter, savedName = "", savedEmail = "" }: SplashProps) {
+export default function Splash({ onEnter }: SplashProps) {
   const [loadingPercent, setLoadingPercent] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
-
-  // Onboarding Modal State for Name & Email
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
-  const [nameInput, setNameInput] = useState(savedName === "Little Bunny" ? "" : savedName);
-  const [emailInput, setEmailInput] = useState(savedEmail);
-  const [errorMessage, setErrorMessage] = useState("");
-
-  const hasValidProfile = Boolean(
-    savedName && 
-    savedName.trim() !== "" && 
-    savedName !== "Little Bunny" && 
-    savedEmail && 
-    savedEmail.trim().includes("@")
-  );
 
   useEffect(() => {
     let current = 0;
@@ -43,47 +27,6 @@ export default function Splash({ onEnter, savedName = "", savedEmail = "" }: Spl
 
     return () => clearInterval(interval);
   }, []);
-
-  const handleMainButtonClick = () => {
-    if (hasValidProfile) {
-      // User already has permanent name & email saved -> enter directly to semester page
-      onEnter(savedName, savedEmail);
-    } else {
-      // New user or incomplete profile -> prompt for Name and Email
-      setNameInput(savedName === "Little Bunny" ? "" : savedName);
-      setEmailInput(savedEmail);
-      setErrorMessage("");
-      setIsOnboardingOpen(true);
-    }
-  };
-
-  const handleSubmitOnboarding = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanName = nameInput.trim();
-    const cleanEmail = emailInput.trim().toLowerCase();
-
-    if (!cleanName) {
-      setErrorMessage("Please enter your name to personalize your study profile.");
-      return;
-    }
-    if (cleanName.length < 2) {
-      setErrorMessage("Name must be at least 2 characters long.");
-      return;
-    }
-    if (!cleanEmail) {
-      setErrorMessage("Please enter your email ID.");
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanEmail)) {
-      setErrorMessage("Please provide a valid email address (e.g. name@student.com).");
-      return;
-    }
-
-    setErrorMessage("");
-    setIsOnboardingOpen(false);
-    onEnter(cleanName, cleanEmail);
-  };
 
   if (!isLoaded) {
     return (
@@ -144,39 +87,9 @@ export default function Splash({ onEnter, savedName = "", savedEmail = "" }: Spl
           Knowledge stored by <span className="text-[#1E1412] font-extrabold underline decoration-[#D97706] decoration-2">seniors</span>, discovered by <span className="text-[#D97706] font-extrabold underline decoration-[#1E1412]/30 decoration-2">juniors</span>.
         </p>
 
-        {/* Personalized Welcome Badge if user previously saved profile */}
-        {hasValidProfile && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="mb-6 inline-flex items-center gap-3 px-4 py-2 bg-[#FAF3E0] border border-[#D97706]/40 rounded-2xl shadow-xs"
-          >
-            <div className="w-8 h-8 rounded-full bg-[#D97706] text-white flex items-center justify-center font-bold text-sm">
-              {savedName.charAt(0).toUpperCase()}
-            </div>
-            <div className="text-left">
-              <p className="text-xs font-bold text-[#1E1412] flex items-center gap-1.5">
-                Welcome back, {savedName} <Sparkles size={13} className="text-[#D97706]" />
-              </p>
-              <p className="text-[11px] text-[#735E55] font-mono">{savedEmail}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setNameInput(savedName);
-                setEmailInput(savedEmail);
-                setIsOnboardingOpen(true);
-              }}
-              className="text-[10px] font-bold text-[#D97706] hover:text-[#92400E] underline ml-2 cursor-pointer"
-            >
-              Edit
-            </button>
-          </motion.div>
-        )}
-
         {/* Enter Burrow Button */}
         <button
-          onClick={handleMainButtonClick}
+          onClick={() => onEnter()}
           className="group relative inline-flex items-center justify-center px-10 py-5 bg-[#1E1412] text-white rounded-2xl overflow-hidden shadow-xl hover:bg-[#2C1E1B] transition-all hover:scale-105 active:scale-95 duration-200 cursor-pointer font-sans font-bold text-lg border border-[#D97706]/30"
         >
           <div className="absolute inset-0 bg-[#D97706] opacity-0 group-hover:opacity-20 transition-opacity"></div>
@@ -245,102 +158,8 @@ export default function Splash({ onEnter, savedName = "", savedEmail = "" }: Spl
           </a>
         </motion.p>
       </motion.div>
-
-      {/* Profile Onboarding Modal for New Users or Profile Edit */}
-      <AnimatePresence>
-        {isOnboardingOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#1E1412]/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.92, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
-              className="bg-[#FDFBF7] w-full max-w-md rounded-3xl p-6 md:p-8 shadow-2xl border-2 border-[#D97706]/30 relative text-left"
-            >
-              {/* Header with Rabbit branding */}
-              <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[#E2D4C3]">
-                <div className="w-12 h-12 rounded-2xl bg-[#FAF3E0] border border-[#D97706]/30 flex items-center justify-center shadow-xs">
-                  <Logo size="sm" />
-                </div>
-                <div>
-                  <h3 className="font-sans text-xl font-extrabold text-[#1E1412]">
-                    Enter The Burrow 🥕
-                  </h3>
-                  <p className="text-xs text-[#735E55]">
-                    Tell us who's studying today to personalize your academic desk
-                  </p>
-                </div>
-              </div>
-
-              {errorMessage && (
-                <div className="mb-5 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
-                  {errorMessage}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmitOnboarding} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-extrabold text-[#1E1412] mb-1.5 uppercase tracking-wider">
-                    Your Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#735E55]" />
-                    <input
-                      type="text"
-                      value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value)}
-                      placeholder="Enter your name"
-                      autoFocus
-                      required
-                      className="w-full bg-white pl-10 pr-4 py-3 rounded-xl border border-[#E2D4C3] focus:outline-none focus:border-[#D97706] focus:ring-2 focus:ring-[#D97706]/20 text-sm font-medium text-[#1E1412] placeholder-gray-400 transition-all shadow-xs"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-extrabold text-[#1E1412] mb-1.5 uppercase tracking-wider">
-                    Student Email ID <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#735E55]" />
-                    <input
-                      type="email"
-                      value={emailInput}
-                      onChange={(e) => setEmailInput(e.target.value)}
-                      placeholder="Enter your email"
-                      required
-                      className="w-full bg-white pl-10 pr-4 py-3 rounded-xl border border-[#E2D4C3] focus:outline-none focus:border-[#D97706] focus:ring-2 focus:ring-[#D97706]/20 text-sm font-medium text-[#1E1412] placeholder-gray-400 transition-all shadow-xs"
-                    />
-                  </div>
-                  <p className="text-[11px] text-[#735E55] mt-1.5">
-                    Your name & email are stored permanently on your browser profile for notes, feedback & semesters.
-                  </p>
-                </div>
-
-                <div className="pt-4 flex items-center justify-end gap-3">
-                  {hasValidProfile && (
-                    <button
-                      type="button"
-                      onClick={() => setIsOnboardingOpen(false)}
-                      className="px-4 py-2.5 rounded-xl text-xs font-bold text-[#735E55] hover:bg-[#E2D4C3]/40 transition-colors cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                  <button
-                    type="submit"
-                    className="flex-1 sm:flex-none px-6 py-3 bg-[#1E1412] hover:bg-[#2C1E1B] text-white rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer border border-[#D97706]/30"
-                  >
-                    <span>Hop into Burrow</span>
-                    <ArrowRight size={16} className="text-[#FDE68A]" />
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
+
 

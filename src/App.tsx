@@ -5,7 +5,9 @@ import { Course, Subject, Semester, Unit, StudyMaterial, AppNotification, Studen
 
 // Import Components
 import Sidebar from "./components/Sidebar";
-import Splash from "./components/Splash";
+import LoadingScreen from "./components/LoadingScreen";
+import WelcomeScreen from "./components/WelcomeScreen";
+import StudentEntry from "./components/StudentEntry";
 import CourseSelection from "./components/CourseSelection";
 import CurriculumRoadmap from "./components/CurriculumRoadmap";
 import CuratedSubjects from "./components/CuratedSubjects";
@@ -17,6 +19,7 @@ import AddSubjectModal from "./components/AddSubjectModal";
 import PasswordResetModal from "./components/PasswordResetModal";
 import GlobalSearchModal from "./components/GlobalSearchModal";
 import StudentFeedbackModal from "./components/StudentFeedbackModal";
+import StudentProfileModal from "./components/StudentProfileModal";
 import FirebaseDiagnosticsPanel from "./components/FirebaseDiagnosticsPanel";
 import { Logo } from "./components/Logo";
 import { logDiagnostic, saveCoursesToFirestore, loadCoursesFromFirestore, subscribeCoursesFromFirestore, saveNotificationsToFirestore, subscribeNotificationsFromFirestore, saveFeedbackToFirestore, subscribeFeedbackFromFirestore } from "./lib/firebase";
@@ -41,6 +44,8 @@ const hasAllDefaultCourses = (value: unknown): value is Course[] => {
   return initialCourses.every((course) => savedCourseIds.has(course.id));
 };
 
+export type AppPhase = "loading" | "welcome" | "profile_entry" | "course_selection" | "main";
+
 export default function App() {
   // Website Background Color State with Local Storage persistence
   const [bgColor, setBgColor] = useState<string>(() => {
@@ -59,8 +64,17 @@ export default function App() {
     if (typeof window === "undefined") return null;
     const hash = window.location.hash.replace(/^#/, "");
     if (!hash) return null;
-    if (hash === "splash") {
-      return { isSplash: true, courseId: null, semId: null, subId: null, tab: "semesters" };
+    if (hash === "loading") {
+      return { phase: "loading" as AppPhase, courseId: null, semId: null, subId: null, tab: "semesters" };
+    }
+    if (hash === "welcome") {
+      return { phase: "welcome" as AppPhase, courseId: null, semId: null, subId: null, tab: "semesters" };
+    }
+    if (hash === "profile-setup" || hash === "profile") {
+      return { phase: "profile_entry" as AppPhase, courseId: null, semId: null, subId: null, tab: "semesters" };
+    }
+    if (hash === "select-course") {
+      return { phase: "course_selection" as AppPhase, courseId: null, semId: null, subId: null, tab: "semesters" };
     }
     const params = new URLSearchParams(hash);
     const courseId = params.get("course") || null;
@@ -69,7 +83,7 @@ export default function App() {
     const subId = params.get("subject") || null;
     const tab = params.get("tab") || (subId ? "units" : semId ? "subjects" : "semesters");
     return {
-      isSplash: false,
+      phase: "loading" as AppPhase, // Always begin with loading sequence on fresh load
       courseId,
       semId: Number.isNaN(semId) ? null : semId,
       subId,
@@ -77,8 +91,17 @@ export default function App() {
     };
   }, []);
 
-  // Splash Screen State - always land on entry page ("Enter the Burrow") when website is opened or revisited
-  const [isSplash, setIsSplash] = useState<boolean>(true);
+  // Multi-step Application Phase: loading -> welcome -> profile_entry -> course_selection -> main
+  const [appPhase, setAppPhase] = useState<AppPhase>("loading");
+
+  // Track if user has completed student identification and chosen their first course
+  const [isOnboarded, setIsOnboarded] = useState<boolean>(() => {
+    const flag = localStorage.getItem("read_rabbit_onboarded") === "true";
+    const name = localStorage.getItem("read_rabbit_student_name");
+    const email = localStorage.getItem("read_rabbit_student_email");
+    const courseId = localStorage.getItem("read_rabbit_selected_course_id");
+    return flag && Boolean(name && name.trim() && name !== "Little Bunny") && Boolean(email && email.trim()) && Boolean(courseId);
+  });
 
   // Core Courses State with Local Storage persistence
   const [courses, setCourses] = useState<Course[]>(() => {
@@ -146,6 +169,14 @@ export default function App() {
   const [studentEmail, setStudentEmail] = useState(() => {
     return localStorage.getItem("read_rabbit_student_email") || "";
   });
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  const handleSaveStudentProfile = (name: string, email: string) => {
+    setStudentName(name);
+    setStudentEmail(email);
+    localStorage.setItem("read_rabbit_student_name", name);
+    localStorage.setItem("read_rabbit_student_email", email);
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -646,13 +677,16 @@ export default function App() {
 
   // Helper to construct URL Hash string
   const buildLocationHash = (
-    splashVal: boolean,
+    phase: AppPhase,
     courseId: string | null,
     semId: number | null,
     subId: string | null,
     tab: string
   ) => {
-    if (splashVal) return "#splash";
+    if (phase === "loading") return "#loading";
+    if (phase === "welcome") return "#welcome";
+    if (phase === "profile_entry") return "#profile-setup";
+    if (phase === "course_selection") return "#select-course";
     const params = new URLSearchParams();
     if (courseId) params.set("course", courseId);
     if (semId !== null) params.set("sem", semId.toString());
@@ -666,8 +700,6 @@ export default function App() {
   useEffect(() => {
     if (selectedCourseId) {
       localStorage.setItem("read_rabbit_selected_course_id", selectedCourseId);
-    } else {
-      localStorage.removeItem("read_rabbit_selected_course_id");
     }
 
     if (selectedSemesterId !== null) {
@@ -682,19 +714,18 @@ export default function App() {
       localStorage.removeItem("read_rabbit_selected_subject_id");
     }
 
-    localStorage.setItem("read_rabbit_is_splash", isSplash ? "true" : "false");
     localStorage.setItem("read_rabbit_active_tab", activeTab);
 
     // Keep URL Hash synchronized for instant refresh recovery
-    const targetHash = buildLocationHash(isSplash, selectedCourseId, selectedSemesterId, selectedSubjectId, activeTab);
+    const targetHash = buildLocationHash(appPhase, selectedCourseId, selectedSemesterId, selectedSubjectId, activeTab);
     if (window.location.hash !== targetHash) {
       window.history.replaceState(
-        { isSplash, selectedCourseId, selectedSemesterId, selectedSubjectId, activeTab },
+        { appPhase, selectedCourseId, selectedSemesterId, selectedSubjectId, activeTab },
         "",
         targetHash || window.location.pathname + window.location.search
       );
     }
-  }, [selectedCourseId, selectedSemesterId, selectedSubjectId, isSplash, activeTab]);
+  }, [selectedCourseId, selectedSemesterId, selectedSubjectId, appPhase, activeTab]);
 
   // Helper to verify single configured admin email
   const isApprovedAdminEmail = (userEmail?: string | null): boolean => {
@@ -748,11 +779,11 @@ export default function App() {
     semesterId: number | null,
     subjectId: string | null,
     tab: string,
-    splashVal: boolean = false
+    phase: AppPhase = "main"
   ) => {
-    const targetHash = buildLocationHash(splashVal, courseId, semesterId, subjectId, tab);
+    const targetHash = buildLocationHash(phase, courseId, semesterId, subjectId, tab);
     const newState = {
-      isSplash: splashVal,
+      appPhase: phase,
       selectedCourseId: courseId,
       selectedSemesterId: semesterId,
       selectedSubjectId: subjectId,
@@ -765,20 +796,20 @@ export default function App() {
   // Synchronize popstate event (Browser Back / Mobile Back Gesture)
   useEffect(() => {
     const initialHist = {
-      isSplash,
+      appPhase,
       selectedCourseId,
       selectedSemesterId,
       selectedSubjectId,
       activeTab
     };
-    const initialHash = buildLocationHash(isSplash, selectedCourseId, selectedSemesterId, selectedSubjectId, activeTab);
+    const initialHash = buildLocationHash(appPhase, selectedCourseId, selectedSemesterId, selectedSubjectId, activeTab);
     window.history.replaceState(initialHist, "", initialHash || window.location.pathname + window.location.search);
 
     const handlePopState = (e: PopStateEvent) => {
       const state = e.state;
       if (state && typeof state === "object") {
-        if (typeof state.isSplash === "boolean") {
-          setIsSplash(state.isSplash);
+        if (state.appPhase) {
+          setAppPhase(state.appPhase);
         }
         setSelectedCourseId(state.selectedCourseId ?? null);
         setSelectedSemesterId(state.selectedSemesterId ?? null);
@@ -790,19 +821,35 @@ export default function App() {
         // Parse location hash if state is missing
         const hash = window.location.hash.replace(/^#/, "");
         if (hash) {
+          if (hash === "loading") {
+            setAppPhase("loading");
+            return;
+          }
+          if (hash === "welcome") {
+            setAppPhase("welcome");
+            return;
+          }
+          if (hash === "profile-setup" || hash === "profile") {
+            setAppPhase("profile_entry");
+            return;
+          }
+          if (hash === "select-course") {
+            setAppPhase("course_selection");
+            return;
+          }
           const params = new URLSearchParams(hash);
           const cId = params.get("course");
           const sStr = params.get("sem");
           const sId = sStr ? parseInt(sStr, 10) : null;
           const sub = params.get("subject");
           const t = params.get("tab") || (sub ? "units" : sId ? "subjects" : "semesters");
-          setIsSplash(hash === "splash");
+          setAppPhase("main");
           setSelectedCourseId(cId);
           setSelectedSemesterId(sId);
           setSelectedSubjectId(sub);
           setActiveTab(t);
         } else {
-          setIsSplash(false);
+          setAppPhase("welcome");
           setSelectedSubjectId(null);
           setSelectedSemesterId(null);
           setActiveTab("semesters");
@@ -881,17 +928,19 @@ export default function App() {
   // Navigation handlers
   const handleSelectCourse = (courseId: string) => {
     setSelectedCourseId(courseId);
+    localStorage.setItem("read_rabbit_selected_course_id", courseId);
+    localStorage.setItem("read_rabbit_onboarded", "true");
+    setIsOnboarded(true);
+    setAppPhase("main");
     setSelectedSemesterId(null);
     setSelectedSubjectId(null);
     setActiveTab("semesters");
-    pushAppHistory(courseId, null, null, "semesters");
+    pushAppHistory(courseId, null, null, "semesters", "main");
   };
 
   const handleChangeCourseClick = () => {
-    setSelectedCourseId(null);
-    setSelectedSemesterId(null);
-    setSelectedSubjectId(null);
-    pushAppHistory(null, null, null, "semesters");
+    setAppPhase("course_selection");
+    pushAppHistory(selectedCourseId, null, null, "semesters", "course_selection");
   };
 
   const handleSelectSemester = (courseId: string, semesterId: number) => {
@@ -899,7 +948,7 @@ export default function App() {
     setSelectedSemesterId(semesterId);
     setSelectedSubjectId(null);
     setActiveTab("subjects"); // Sub-navigation state to render subject cards
-    pushAppHistory(courseId, semesterId, null, "subjects");
+    pushAppHistory(courseId, semesterId, null, "subjects", "main");
   };
 
   const handleUnlockAllSemesters = () => {
@@ -1070,60 +1119,107 @@ export default function App() {
     return await saveCurriculumToServer(nextCourses);
   };
 
-  // Handle entering the Burrow from Splash screen
-  const handleEnterBurrow = (name?: string, email?: string) => {
-    if (name) {
-      setStudentName(name);
-      localStorage.setItem("read_rabbit_student_name", name);
-    }
-    if (email) {
-      setStudentEmail(email);
-      localStorage.setItem("read_rabbit_student_email", email);
-    }
-    setIsSplash(false);
-    localStorage.setItem("read_rabbit_is_splash", "false");
-
-    // Seamlessly land directly on the Semester Roadmap page
-    const targetCourseId = selectedCourseId || (courses && courses.length > 0 ? courses[0].id : "general");
-    setSelectedCourseId(targetCourseId);
-    setSelectedSemesterId(null);
-    setSelectedSubjectId(null);
-    setActiveTab("semesters");
-    pushAppHistory(targetCourseId, null, null, "semesters");
+  // 1. Loading sequence complete callback
+  const handleLoadingComplete = () => {
+    setAppPhase("welcome");
   };
 
-  // Exit App handler (Splash trigger)
+  // 2. Welcome screen continue callback
+  const handleWelcomeContinue = () => {
+    // If returning user has already onboarded with name, email and selected course,
+    // directly enter their selected course's semester page!
+    if (isOnboarded && selectedCourseId) {
+      setAppPhase("main");
+      setSelectedSemesterId(null);
+      setSelectedSubjectId(null);
+      setActiveTab("semesters");
+      pushAppHistory(selectedCourseId, null, null, "semesters", "main");
+    } else if (studentName && studentName.trim() && studentName !== "Little Bunny" && studentEmail && studentEmail.trim()) {
+      // User has name/email but hasn't selected course yet
+      setAppPhase("course_selection");
+    } else {
+      // First-time user: proceed to email address and name entry page
+      setAppPhase("profile_entry");
+    }
+  };
+
+  // Switch course action from Welcome screen
+  const handleWelcomeChangeCourse = () => {
+    setAppPhase("course_selection");
+  };
+
+  // 3. Profile Entry Submit handler (Step 1 -> Step 2)
+  const handleProfileSubmit = (name: string, email: string) => {
+    setStudentName(name);
+    setStudentEmail(email);
+    localStorage.setItem("read_rabbit_student_name", name);
+    localStorage.setItem("read_rabbit_student_email", email);
+    // Proceed to Step 4: Selection of Course Page
+    setAppPhase("course_selection");
+  };
+
+  // Exit App handler (return to Welcome Screen)
   const handleExitApp = () => {
-    setIsSplash(true);
+    setAppPhase("welcome");
     setSelectedSemesterId(null);
     setSelectedSubjectId(null);
     setIsAdmin(false);
     setActiveTab("semesters");
+    pushAppHistory(selectedCourseId, null, null, "semesters", "welcome");
   };
 
-  // 1. Splash Screen ("Enter The Burrow" landing)
-  if (isSplash) {
+  // 1. Loading Screen (shown first on page open)
+  if (appPhase === "loading") {
+    return <LoadingScreen onComplete={handleLoadingComplete} />;
+  }
+
+  // 2. Welcome Screen (shown after loading)
+  if (appPhase === "welcome") {
     return (
-      <Splash
-        onEnter={handleEnterBurrow}
-        savedName={studentName}
-        savedEmail={studentEmail}
+      <WelcomeScreen
+        studentName={studentName}
+        selectedCourse={activeCourse}
+        isReturningUser={isOnboarded && Boolean(selectedCourseId)}
+        onContinue={handleWelcomeContinue}
+        onChangeCourse={handleWelcomeChangeCourse}
       />
     );
   }
 
-  // 2. Course Selection Screen (if no course is selected yet)
-  if (!selectedCourseId) {
+  // 3. Email and Name Entry Page (for first time user)
+  if (appPhase === "profile_entry") {
+    return (
+      <StudentEntry
+        initialName=""
+        initialEmail=""
+        onSubmit={handleProfileSubmit}
+        onBack={() => setAppPhase("welcome")}
+      />
+    );
+  }
+
+  // 4. Selection of Course Page (for first time user or when switching course)
+  if (appPhase === "course_selection" || (!selectedCourseId && appPhase === "main")) {
     return (
       <CourseSelection
         courses={courses}
         onSelectCourse={handleSelectCourse}
         onOpenAdminPortal={() => {
-          setSelectedCourseId(courses[0].id); // default to first course to enter workspace
+          setSelectedCourseId(courses[0].id);
+          setAppPhase("main");
           setActiveTab("admin");
         }}
         isAdmin={isAdmin}
         onSecretTrigger={handleSecretAdminTrigger}
+        isOnboarding={!isOnboarded}
+        onBack={() => {
+          if (!isOnboarded) {
+            setAppPhase("profile_entry");
+          } else {
+            setAppPhase("main");
+          }
+        }}
+        studentName={studentName}
       />
     );
   }
@@ -1347,27 +1443,27 @@ export default function App() {
               </span>
             </button>
 
-            {/* Profile badge with click to open settings */}
+            {/* Profile badge with click to open student profile modal */}
             <button
               type="button"
-              onClick={() => {
-                setActiveTab("settings");
-                setSelectedSemesterId(null);
-                setSelectedSubjectId(null);
-              }}
+              onClick={() => setIsProfileModalOpen(true)}
               className="flex items-center gap-2 px-3 py-1 bg-white hover:bg-[#FAF3E0] rounded-xl border border-[#dac1c1]/20 shadow-xs cursor-pointer transition-colors text-left"
-              title={`Profile: ${studentName}${studentEmail ? ` (${studentEmail})` : ''} - Click to customize`}
+              title={`Student Profile: ${studentName}${studentEmail ? ` (${studentEmail})` : ''} - Click to edit name & email`}
             >
               <div className="w-7 h-7 rounded-full bg-[#f8e6cb] border border-[#D97706]/30 flex items-center justify-center font-sans text-xs font-bold text-[#95491a] shrink-0">
                 {studentName.charAt(0).toUpperCase()}
               </div>
               <div className="hidden md:flex flex-col">
                 <span className="font-sans text-xs font-bold text-[#544243] leading-tight">
-                  {studentName}
+                  {studentName === "Little Bunny" ? "My Profile" : studentName}
                 </span>
-                {studentEmail && (
+                {studentEmail ? (
                   <span className="font-mono text-[9px] text-[#877272] leading-tight max-w-[110px] truncate">
                     {studentEmail}
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-[#D97706] font-semibold leading-tight">
+                    Add Details
                   </span>
                 )}
               </div>
@@ -1638,7 +1734,7 @@ export default function App() {
               if (window.history && window.history.replaceState) {
                 window.history.replaceState(null, "", window.location.pathname);
               }
-              setIsSplash(false);
+              setAppPhase("main");
               setActiveTab("admin");
             }}
           />
@@ -1667,6 +1763,19 @@ export default function App() {
             onNavigateToSubject={handleNavigateFromSearchSubject}
             onNavigateToUnit={handleNavigateFromSearchUnit}
             onNavigateToLibrary={handleNavigateFromSearchLibrary}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Student Profile Modal for setting / editing Name & Email after entering burrow */}
+      <AnimatePresence>
+        {isProfileModalOpen && (
+          <StudentProfileModal
+            isOpen={isProfileModalOpen}
+            onClose={() => setIsProfileModalOpen(false)}
+            studentName={studentName}
+            studentEmail={studentEmail}
+            onSaveProfile={handleSaveStudentProfile}
           />
         )}
       </AnimatePresence>
