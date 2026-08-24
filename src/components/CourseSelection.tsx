@@ -164,7 +164,7 @@ export default function CourseSelection({
           <div className="flex flex-col gap-1 text-center sm:text-left">
             <span>Read Rabbit Academic Portal © 2026. All study resources are peer-certified.</span>
             <span className="text-[#D97706] font-medium">
-              Created with ☕ & 🍯 by <strong className="text-[#1E1412]">Umme Ruksar</strong> &{" "}
+              Created with ☕ & 🍯 by <strong className="text-[#1E1412]">Umme Ruksar</strong>,{" "}
               <a
                 href="https://www.instagram.com/_bharatvanshi"
                 target="_blank"
@@ -172,6 +172,15 @@ export default function CourseSelection({
                 className="text-[#1E1412] font-bold hover:text-[#95491a] transition-colors cursor-pointer"
               >
                 Balaji C
+              </a>{" "}
+              &{" "}
+              <a
+                href="https://www.instagram.com/_itz_ganesh_466?igsi=MWo0dzM1dHQzMmxidA=="
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#1E1412] font-bold hover:text-[#95491a] transition-colors cursor-pointer"
+              >
+                Ganesh S
               </a>
             </span>
           </div>

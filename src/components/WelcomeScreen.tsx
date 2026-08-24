@@ -153,7 +153,7 @@ export default function WelcomeScreen({
           transition={{ delay: 0.45, duration: 0.7 }}
           className="mt-12 text-xs font-sans text-[#735E55] tracking-wider"
         >
-          Created with ☕ & 🍯 by <span className="font-bold text-[#1E1412]">Umme Ruksar</span> &{" "}
+          Created with ☕ & 🍯 by <span className="font-bold text-[#1E1412]">Umme Ruksar</span>,{" "}
           <a
             href="https://www.instagram.com/_bharatvanshi"
             target="_blank"
@@ -161,6 +161,15 @@ export default function WelcomeScreen({
             className="font-bold text-[#1E1412] hover:text-[#95491a] transition-colors cursor-pointer"
           >
             Balaji C
+          </a>{" "}
+          &{" "}
+          <a
+            href="https://www.instagram.com/_itz_ganesh_466?igsi=MWo0dzM1dHQzMmxidA=="
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold text-[#1E1412] hover:text-[#95491a] transition-colors cursor-pointer"
+          >
+            Ganesh S
           </a>
         </motion.p>
       </motion.div>
