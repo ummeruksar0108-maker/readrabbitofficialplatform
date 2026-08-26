@@ -16,8 +16,8 @@ export default function StudentEntry({
   onSubmit,
   onBack,
 }: StudentEntryProps) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [name, setName] = useState(initialName || "");
+  const [email, setEmail] = useState(initialEmail || "");
   const [errorMessage, setErrorMessage] = useState("");
 
   const handleSubmit = (e: FormEvent) => {

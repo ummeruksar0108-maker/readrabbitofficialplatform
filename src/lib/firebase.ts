@@ -1,8 +1,9 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeFirestore, getFirestore, doc, setDoc, getDoc, onSnapshot, Firestore } from "firebase/firestore";
+import { initializeFirestore, getFirestore, doc, setDoc, getDoc, getDocs, collection, deleteDoc, onSnapshot, Firestore } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { uploadFileToSupabaseStorage } from "./supabase";
 import config from "../../firebase-applet-config.json";
+import { StudentVisitor } from "../types";
 
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(config) : getApp();
@@ -435,4 +436,114 @@ export async function getFileContentFromCloud(fileUrl: string): Promise<string> 
     }
   }
   return fileUrl;
+}
+
+/**
+ * Saves or updates a student visitor profile to Firestore cloud database.
+ */
+export async function saveStudentVisitorToFirestore(visitorData: {
+  name: string;
+  email: string;
+  courseId?: string;
+  courseName?: string;
+}): Promise<void> {
+  const cleanName = (visitorData.name || "").trim();
+  const cleanEmail = (visitorData.email || "").trim();
+  if (!cleanName || cleanName === "Little Bunny") return;
+
+  try {
+    // Generate deterministic doc ID based on email if available, or encoded name
+    const docId = cleanEmail
+      ? cleanEmail.toLowerCase().replace(/[^a-z0-9]/g, "_")
+      : cleanName.toLowerCase().replace(/[^a-z0-9]/g, "_");
+
+    const visitorDocRef = doc(db, "student_visitors", docId);
+    const existingSnap = await getDoc(visitorDocRef);
+
+    const nowStr = new Date().toLocaleString();
+    const nowTimestamp = Date.now();
+
+    if (existingSnap.exists()) {
+      const existing = existingSnap.data();
+      await setDoc(
+        visitorDocRef,
+        {
+          id: docId,
+          name: cleanName || existing.name,
+          email: cleanEmail || existing.email,
+          courseId: visitorData.courseId || existing.courseId || "general",
+          courseName: visitorData.courseName || existing.courseName || "BCA",
+          firstVisit: existing.firstVisit || nowStr,
+          lastActive: nowStr,
+          lastActiveTimestamp: nowTimestamp,
+          visitCount: (existing.visitCount || 1) + 1,
+          updatedAt: new Date().toISOString()
+        },
+        { merge: true }
+      );
+      logDiagnostic("success", `[Firestore] Updated student visitor '${cleanName}' (${cleanEmail}) in cloud.`);
+    } else {
+      await setDoc(visitorDocRef, {
+        id: docId,
+        name: cleanName,
+        email: cleanEmail,
+        courseId: visitorData.courseId || "general",
+        courseName: visitorData.courseName || "BCA",
+        firstVisit: nowStr,
+        lastActive: nowStr,
+        lastActiveTimestamp: nowTimestamp,
+        visitCount: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      logDiagnostic("success", `[Firestore] Saved new student visitor '${cleanName}' (${cleanEmail}) to cloud.`);
+    }
+  } catch (err: any) {
+    console.warn("[Firestore Visitor Sync Error]", err);
+    logDiagnostic("warn", `[Firestore Visitor Sync Failed] ${err?.message || err}`);
+  }
+}
+
+/**
+ * Loads all student visitors from Firestore.
+ */
+export async function loadStudentVisitorsFromFirestore(): Promise<StudentVisitor[]> {
+  try {
+    const colRef = collection(db, "student_visitors");
+    const snapshot = await getDocs(colRef);
+    const results: StudentVisitor[] = [];
+    snapshot.forEach((d) => {
+      const data = d.data();
+      results.push({
+        id: data.id || d.id,
+        name: data.name || "Student",
+        email: data.email || "",
+        courseId: data.courseId || "general",
+        courseName: data.courseName || "General",
+        firstVisit: data.firstVisit || data.lastActive || "Recently",
+        lastActive: data.lastActive || "Recently",
+        visitCount: data.visitCount || 1,
+        lastActiveTimestamp: data.lastActiveTimestamp || Date.now()
+      });
+    });
+    return results;
+  } catch (err: any) {
+    console.warn("[Firestore Fetch Visitors Error]", err);
+    return [];
+  }
+}
+
+/**
+ * Deletes a student visitor document from Firestore.
+ */
+export async function deleteStudentVisitorFromFirestore(visitorId: string): Promise<boolean> {
+  try {
+    const visitorDocRef = doc(db, "student_visitors", visitorId);
+    await deleteDoc(visitorDocRef);
+    logDiagnostic("info", `[Firestore] Deleted student visitor '${visitorId}'`);
+    return true;
+  } catch (err: any) {
+    console.warn("[Firestore Delete Visitor Error]", err);
+    return false;
+  }
 }

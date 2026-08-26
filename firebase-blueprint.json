@@ -27,6 +27,22 @@
         "uploadedAt": { "type": "string" }
       },
       "required": ["name"]
+    },
+    "student_visitors": {
+      "title": "Student Visitors",
+      "description": "Stores registered student profiles and activity records across web sessions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "courseId": { "type": "string" },
+        "courseName": { "type": "string" },
+        "lastActive": { "type": "string" },
+        "lastActiveTimestamp": { "type": "number" },
+        "visitCount": { "type": "number" }
+      },
+      "required": ["name", "email"]
     }
   },
   "firestore": {
@@ -37,6 +53,10 @@
     "/uploaded_files/{fileId}": {
       "schema": "uploaded_files",
       "description": "Stores uploaded file metadata and binary content"
+    },
+    "/student_visitors/{visitorId}": {
+      "schema": "student_visitors",
+      "description": "Stores student user profile and access directory documents"
     }
   }
 }

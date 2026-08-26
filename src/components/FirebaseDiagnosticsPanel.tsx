@@ -54,25 +54,25 @@ export default function FirebaseDiagnosticsPanel({ coursesData }: { coursesData?
     switch (status) {
       case "SUCCESS":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-            <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> SUCCESS
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">
+            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> SUCCESS
           </span>
         );
       case "FIRESTORE_DOC":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
-            <FileText className="w-3 h-3 text-blue-600 dark:text-blue-400" /> FIRESTORE DOC
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">
+            <FileText className="w-3 h-3 text-blue-600" /> FIRESTORE DOC
           </span>
         );
       case "FAILED":
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
-            <XCircle className="w-3 h-3 text-rose-600 dark:text-rose-400" /> FAILED
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-rose-100 text-rose-800">
+            <XCircle className="w-3 h-3 text-rose-600" /> FAILED
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-zinc-300">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700">
             <Clock className="w-3 h-3 text-gray-500" /> {status}
           </span>
         );
@@ -107,7 +107,7 @@ export default function FirebaseDiagnosticsPanel({ coursesData }: { coursesData?
 
       {/* Main Expanded Diagnostics Panel */}
       {isOpen && (
-        <div className="w-[360px] sm:w-[420px] max-h-[85vh] bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-3 duration-200">
+        <div className="w-[360px] sm:w-[420px] max-h-[85vh] bg-white text-zinc-800 rounded-2xl shadow-2xl border border-zinc-200 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-3 duration-200">
           
           {/* Header Bar */}
           <div className="flex items-center justify-between p-3.5 bg-zinc-900 text-white border-b border-zinc-800">
@@ -144,38 +144,38 @@ export default function FirebaseDiagnosticsPanel({ coursesData }: { coursesData?
           <div className="p-3.5 space-y-3 overflow-y-auto text-xs font-mono">
             
             {/* 1. Firestore Read Status */}
-            <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60">
+            <div className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5">
+                <span className="font-semibold text-zinc-700 flex items-center gap-1.5">
                   <Server className="w-3.5 h-3.5 text-blue-500" />
                   Firestore Read Status
                 </span>
                 {getStatusBadge(diag.readStatus)}
               </div>
-              <div className="grid grid-cols-2 gap-1 text-[11px] text-zinc-600 dark:text-zinc-400">
-                <div>Source: <span className="text-zinc-800 dark:text-zinc-200">{diag.readSource}</span></div>
-                <div>Doc: <span className="text-zinc-800 dark:text-zinc-200 font-bold">{diag.readDocPath}</span></div>
-                <div>Last Read: <span className="text-zinc-800 dark:text-zinc-200">{diag.lastReadTime}</span></div>
-                <div>Courses: <span className="text-zinc-800 dark:text-zinc-200 font-bold">{diag.readCourseCount}</span></div>
+              <div className="grid grid-cols-2 gap-1 text-[11px] text-zinc-600">
+                <div>Source: <span className="text-zinc-800">{diag.readSource}</span></div>
+                <div>Doc: <span className="text-zinc-800 font-bold">{diag.readDocPath}</span></div>
+                <div>Last Read: <span className="text-zinc-800">{diag.lastReadTime}</span></div>
+                <div>Courses: <span className="text-zinc-800 font-bold">{diag.readCourseCount}</span></div>
               </div>
               {diag.readError && (
-                <div className="mt-1.5 p-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] rounded break-all border border-rose-500/20">
+                <div className="mt-1.5 p-1.5 bg-rose-500/10 text-rose-600 text-[10px] rounded break-all border border-rose-500/20">
                   ⚠️ Error: {diag.readError}
                 </div>
               )}
             </div>
 
             {/* 2. Firebase Storage Upload Status */}
-            <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60">
+            <div className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5">
+                <span className="font-semibold text-zinc-700 flex items-center gap-1.5">
                   <HardDrive className="w-3.5 h-3.5 text-amber-500" />
                   Firebase Storage Upload
                 </span>
                 {getStatusBadge(diag.storageStatus)}
               </div>
               {diag.storageUrl ? (
-                <div className="mt-1 p-1.5 bg-zinc-100 dark:bg-zinc-900 rounded text-[10px] break-all border border-zinc-200 dark:border-zinc-800 text-emerald-600 dark:text-emerald-400">
+                <div className="mt-1 p-1.5 bg-zinc-100 rounded text-[10px] break-all border border-zinc-200 text-emerald-600">
                   <span className="font-bold text-zinc-500 uppercase block text-[9px]">Exact Download URL / Ref:</span>
                   {diag.storageUrl}
                 </div>
@@ -183,31 +183,31 @@ export default function FirebaseDiagnosticsPanel({ coursesData }: { coursesData?
                 <div className="text-[11px] text-zinc-500 italic">No file upload initiated in this session</div>
               )}
               {diag.storageError && (
-                <div className="mt-1.5 p-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] rounded break-all border border-amber-500/20">
+                <div className="mt-1.5 p-1.5 bg-amber-500/10 text-amber-600 text-[10px] rounded break-all border border-amber-500/20">
                   ⚠️ Storage Fail Note: {diag.storageError}
                 </div>
               )}
             </div>
 
             {/* 3. Firestore Write / Persistence Status */}
-            <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60">
+            <div className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="font-semibold text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5">
+                <span className="font-semibold text-zinc-700 flex items-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                   Firestore Write Status
                 </span>
                 {getStatusBadge(diag.writeStatus)}
               </div>
-              <div className="text-[11px] text-zinc-600 dark:text-zinc-400">
-                Target Doc: <span className="font-bold text-zinc-800 dark:text-zinc-200">{diag.writeDocPath}</span>
+              <div className="text-[11px] text-zinc-600">
+                Target Doc: <span className="font-bold text-zinc-800">{diag.writeDocPath}</span>
               </div>
               {diag.writeTimestamp && (
-                <div className="text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
-                  Updated ISO: <span className="text-emerald-600 dark:text-emerald-400 font-bold">{diag.writeTimestamp}</span>
+                <div className="text-[11px] text-zinc-600 mt-0.5">
+                  Updated ISO: <span className="text-emerald-600 font-bold">{diag.writeTimestamp}</span>
                 </div>
               )}
               {diag.writeError && (
-                <div className="mt-1.5 p-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] rounded break-all border border-rose-500/20">
+                <div className="mt-1.5 p-1.5 bg-rose-500/10 text-rose-600 text-[10px] rounded break-all border border-rose-500/20">
                   ❌ Write Error: {diag.writeError}
                 </div>
               )}
@@ -250,7 +250,7 @@ export default function FirebaseDiagnosticsPanel({ coursesData }: { coursesData?
           </div>
 
           {/* Footer Bar */}
-          <div className="p-2.5 bg-zinc-100 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 text-[10px] text-center text-zinc-500">
+          <div className="p-2.5 bg-zinc-100 border-t border-zinc-200 text-[10px] text-center text-zinc-500">
             Cloud database active across PC, Mobile, and Netlify.
           </div>
 

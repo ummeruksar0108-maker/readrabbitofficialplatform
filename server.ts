@@ -79,6 +79,126 @@ app.get("/api/health", (req, res) => {
 // GET /api/notifications - Retrieve globally published notifications
 const NOTIFICATIONS_FILE = path.join(DATA_DIR, "notifications.json");
 const FEEDBACK_FILE = path.join(DATA_DIR, "feedback.json");
+const VISITORS_FILE = path.join(DATA_DIR, "visitors.json");
+
+// GET /api/visitors - Retrieve all logged student visitors and total count
+app.get("/api/visitors", async (req, res) => {
+  try {
+    if (fs.existsSync(VISITORS_FILE)) {
+      const data = await fsPromises.readFile(VISITORS_FILE, "utf-8");
+      const visitors = JSON.parse(data);
+      return res.json({
+        success: true,
+        totalCount: Array.isArray(visitors) ? visitors.length : 0,
+        visitors: Array.isArray(visitors) ? visitors : []
+      });
+    }
+    return res.json({ success: true, totalCount: 0, visitors: [] });
+  } catch (error: any) {
+    console.error("[SERVER VISITORS ERROR]", error);
+    return res.status(500).json({ error: "Failed to read visitors log" });
+  }
+});
+
+// POST /api/visitors - Record or update student visitor
+app.post("/api/visitors", async (req, res) => {
+  try {
+    const { name, email, courseId, courseName } = req.body || {};
+    if (!name || name === "Little Bunny") {
+      return res.json({ success: false, message: "Ignored default guest name" });
+    }
+
+    let visitors: any[] = [];
+    if (fs.existsSync(VISITORS_FILE)) {
+      try {
+        const data = await fsPromises.readFile(VISITORS_FILE, "utf-8");
+        visitors = JSON.parse(data);
+      } catch (e) {
+        visitors = [];
+      }
+    }
+
+    const cleanEmail = (email || "").trim().toLowerCase();
+    const cleanName = (name || "").trim();
+
+    // Check for existing entry matching by email (or name if email is empty)
+    const existingIndex = visitors.findIndex((v: any) => {
+      if (cleanEmail && v.email && v.email.toLowerCase() === cleanEmail) {
+        return true;
+      }
+      return v.name.toLowerCase() === cleanName.toLowerCase() && (!cleanEmail || !v.email || v.email.toLowerCase() === cleanEmail);
+    });
+
+    const nowStr = new Date().toLocaleString();
+    const nowTimestamp = Date.now();
+
+    if (existingIndex >= 0) {
+      const existing = visitors[existingIndex];
+      visitors[existingIndex] = {
+        ...existing,
+        name: cleanName || existing.name,
+        email: cleanEmail || existing.email,
+        courseId: courseId || existing.courseId,
+        courseName: courseName || existing.courseName,
+        lastActive: nowStr,
+        lastActiveTimestamp: nowTimestamp,
+        visitCount: (existing.visitCount || 1) + 1
+      };
+      console.log(`[SERVER VISITOR] Updated visitor record for "${cleanName}" (${cleanEmail || "no email"}) - visit #${visitors[existingIndex].visitCount}`);
+    } else {
+      const newVisitor = {
+        id: "vis_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+        name: cleanName,
+        email: cleanEmail,
+        courseId: courseId || "general",
+        courseName: courseName || "BCA",
+        firstVisit: nowStr,
+        lastActive: nowStr,
+        visitCount: 1,
+        lastActiveTimestamp: nowTimestamp
+      };
+      visitors.unshift(newVisitor);
+      console.log(`[SERVER VISITOR] New student visitor registered: "${cleanName}" (${cleanEmail || "no email"})`);
+    }
+
+    await fsPromises.writeFile(VISITORS_FILE, JSON.stringify(visitors, null, 2));
+    return res.json({
+      success: true,
+      totalCount: visitors.length,
+      visitors
+    });
+  } catch (error: any) {
+    console.error("[SERVER VISITOR ERROR]", error);
+    return res.status(500).json({ error: "Failed to record visitor", details: error.message });
+  }
+});
+
+// DELETE /api/visitors/:id - Remove a visitor record
+app.delete("/api/visitors/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    let visitors: any[] = [];
+    if (fs.existsSync(VISITORS_FILE)) {
+      const data = await fsPromises.readFile(VISITORS_FILE, "utf-8");
+      visitors = JSON.parse(data);
+    }
+    visitors = visitors.filter((v: any) => v.id !== id);
+    await fsPromises.writeFile(VISITORS_FILE, JSON.stringify(visitors, null, 2));
+    return res.json({ success: true, totalCount: visitors.length, visitors });
+  } catch (error: any) {
+    return res.status(500).json({ error: "Failed to delete visitor" });
+  }
+});
+
+// DELETE /api/visitors - Clear all visitors log (Admin only)
+app.delete("/api/visitors", async (req, res) => {
+  try {
+    await fsPromises.writeFile(VISITORS_FILE, JSON.stringify([], null, 2));
+    return res.json({ success: true, totalCount: 0, visitors: [] });
+  } catch (error: any) {
+    return res.status(500).json({ error: "Failed to clear visitors log" });
+  }
+});
 
 app.get("/api/notifications", async (req, res) => {
   try {

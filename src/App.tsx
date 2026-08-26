@@ -22,7 +22,7 @@ import StudentFeedbackModal from "./components/StudentFeedbackModal";
 import StudentProfileModal from "./components/StudentProfileModal";
 import FirebaseDiagnosticsPanel from "./components/FirebaseDiagnosticsPanel";
 import { Logo } from "./components/Logo";
-import { logDiagnostic, saveCoursesToFirestore, loadCoursesFromFirestore, subscribeCoursesFromFirestore, saveNotificationsToFirestore, subscribeNotificationsFromFirestore, saveFeedbackToFirestore, subscribeFeedbackFromFirestore } from "./lib/firebase";
+import { logDiagnostic, saveCoursesToFirestore, loadCoursesFromFirestore, subscribeCoursesFromFirestore, saveNotificationsToFirestore, subscribeNotificationsFromFirestore, saveFeedbackToFirestore, subscribeFeedbackFromFirestore, saveStudentVisitorToFirestore } from "./lib/firebase";
 import { supabase, fetchAllMaterialsFromSupabaseDB, mergeSupabaseMaterialsIntoCourses } from "./lib/supabase";
 
 // Icons for Responsive Top Bar
@@ -47,11 +47,25 @@ const hasAllDefaultCourses = (value: unknown): value is Course[] => {
 export type AppPhase = "loading" | "welcome" | "profile_entry" | "course_selection" | "main";
 
 export default function App() {
-  // Website Background Color State with Local Storage persistence
+  // Website Background Color State with Local Storage persistence (Light themes only)
   const [bgColor, setBgColor] = useState<string>(() => {
-    return localStorage.getItem("read_rabbit_bg_color") || "#FAF3E0";
+    const saved = localStorage.getItem("read_rabbit_bg_color");
+    // If a dark color was previously stored, clear it and default to warm light theme
+    if (
+      saved &&
+      (saved === "#120C0B" ||
+        saved === "#0B0B0C" ||
+        saved === "#1E1412" ||
+        saved === "#2C1E1B" ||
+        saved.startsWith("#0") ||
+        saved.startsWith("#1") ||
+        saved.startsWith("#2"))
+    ) {
+      localStorage.setItem("read_rabbit_bg_color", "#FAF3E0");
+      return "#FAF3E0";
+    }
+    return saved || "#FAF3E0";
   });
-  const [isBgPickerOpen, setIsBgPickerOpen] = useState(false);
 
   // Sync background color to document body
   useEffect(() => {
@@ -82,8 +96,9 @@ export default function App() {
     const semId = semStr ? parseInt(semStr, 10) : null;
     const subId = params.get("subject") || null;
     const tab = params.get("tab") || (subId ? "units" : semId ? "subjects" : "semesters");
+    const phaseParam = params.get("phase") as AppPhase | null;
     return {
-      phase: "loading" as AppPhase, // Always begin with loading sequence on fresh load
+      phase: phaseParam || ("main" as AppPhase),
       courseId,
       semId: Number.isNaN(semId) ? null : semId,
       subId,
@@ -92,15 +107,33 @@ export default function App() {
   }, []);
 
   // Multi-step Application Phase: loading -> welcome -> profile_entry -> course_selection -> main
-  const [appPhase, setAppPhase] = useState<AppPhase>("loading");
+  const [appPhase, setAppPhase] = useState<AppPhase>(() => {
+    const savedName = localStorage.getItem("read_rabbit_student_name");
+    const isUserLoggedIn = Boolean(savedName && savedName.trim() && savedName !== "Little Bunny");
+
+    // If user is logged in, restore their workspace directly on refresh (never ask name/email)
+    if (isUserLoggedIn) {
+      if (initialHashState?.phase && !["loading", "welcome", "profile_entry"].includes(initialHashState.phase)) {
+        return initialHashState.phase;
+      }
+      const savedPhase = localStorage.getItem("read_rabbit_app_phase") as AppPhase | null;
+      if (savedPhase && ["course_selection", "main"].includes(savedPhase)) {
+        return savedPhase;
+      }
+      return "main";
+    }
+
+    // If user is NOT logged in or has explicitly logged out, start fresh with loading sequence
+    if (initialHashState?.phase) {
+      return initialHashState.phase;
+    }
+    return "loading";
+  });
 
   // Track if user has completed student identification and chosen their first course
   const [isOnboarded, setIsOnboarded] = useState<boolean>(() => {
-    const flag = localStorage.getItem("read_rabbit_onboarded") === "true";
     const name = localStorage.getItem("read_rabbit_student_name");
-    const email = localStorage.getItem("read_rabbit_student_email");
-    const courseId = localStorage.getItem("read_rabbit_selected_course_id");
-    return flag && Boolean(name && name.trim() && name !== "Little Bunny") && Boolean(email && email.trim()) && Boolean(courseId);
+    return Boolean(name && name.trim() && name !== "Little Bunny");
   });
 
   // Core Courses State with Local Storage persistence
@@ -176,7 +209,44 @@ export default function App() {
     setStudentEmail(email);
     localStorage.setItem("read_rabbit_student_name", name);
     localStorage.setItem("read_rabbit_student_email", email);
+    logVisitorToServer(name, email);
   };
+
+  // Helper to log or update student visitor to server database and Firestore cloud
+  const logVisitorToServer = (name?: string, email?: string, courseId?: string) => {
+    const currentN = (name || studentName || "").trim();
+    const currentE = (email || studentEmail || "").trim();
+    if (!currentN || currentN === "Little Bunny") return;
+    const targetCourseId = courseId || selectedCourseId;
+    const courseObj = courses.find(c => c.id === targetCourseId);
+    
+    // 1. Persist directly to Firestore Cloud Database
+    saveStudentVisitorToFirestore({
+      name: currentN,
+      email: currentE,
+      courseId: targetCourseId,
+      courseName: courseObj?.name || "BCA"
+    }).catch((e) => console.warn("Firestore visitor sync error:", e));
+
+    // 2. Also log to backend API endpoint
+    fetch("/api/visitors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: currentN,
+        email: currentE,
+        courseId: targetCourseId,
+        courseName: courseObj?.name || "BCA"
+      })
+    }).catch((e) => console.warn("Visitor log background ping error:", e));
+  };
+
+  // Ping visitor on active session startup
+  useEffect(() => {
+    if (isOnboarded && studentName && studentName !== "Little Bunny") {
+      logVisitorToServer(studentName, studentEmail, selectedCourseId);
+    }
+  }, [isOnboarded]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -698,6 +768,11 @@ export default function App() {
 
   // Persist State Changes to Local Storage and Sync URL Hash for reload recovery
   useEffect(() => {
+    // Only store active workspace phase
+    if (appPhase === "main" || appPhase === "course_selection") {
+      localStorage.setItem("read_rabbit_app_phase", appPhase);
+    }
+
     if (selectedCourseId) {
       localStorage.setItem("read_rabbit_selected_course_id", selectedCourseId);
     }
@@ -849,10 +924,20 @@ export default function App() {
           setSelectedSubjectId(sub);
           setActiveTab(t);
         } else {
-          setAppPhase("welcome");
-          setSelectedSubjectId(null);
-          setSelectedSemesterId(null);
-          setActiveTab("semesters");
+          const isUserOnboarded = localStorage.getItem("read_rabbit_onboarded") === "true";
+          const savedName = localStorage.getItem("read_rabbit_student_name");
+          const isUserLoggedIn = isUserOnboarded || Boolean(savedName && savedName.trim() && savedName !== "Little Bunny");
+          const savedCourse = localStorage.getItem("read_rabbit_selected_course_id");
+          const savedPhase = (localStorage.getItem("read_rabbit_app_phase") as AppPhase) || "main";
+          if (isUserLoggedIn) {
+            setAppPhase(savedPhase === "loading" || savedPhase === "welcome" || savedPhase === "profile_entry" ? "main" : savedPhase);
+            if (savedCourse) setSelectedCourseId(savedCourse);
+          } else {
+            setAppPhase("welcome");
+            setSelectedSubjectId(null);
+            setSelectedSemesterId(null);
+            setActiveTab("semesters");
+          }
         }
       }
     };
@@ -936,6 +1021,7 @@ export default function App() {
     setSelectedSubjectId(null);
     setActiveTab("semesters");
     pushAppHistory(courseId, null, null, "semesters", "main");
+    logVisitorToServer(studentName, studentEmail, courseId);
   };
 
   const handleChangeCourseClick = () => {
@@ -1154,18 +1240,39 @@ export default function App() {
     setStudentEmail(email);
     localStorage.setItem("read_rabbit_student_name", name);
     localStorage.setItem("read_rabbit_student_email", email);
+    localStorage.setItem("read_rabbit_onboarded", "true");
+    setIsOnboarded(true);
+    logVisitorToServer(name, email);
     // Proceed to Step 4: Selection of Course Page
     setAppPhase("course_selection");
   };
 
-  // Exit App handler (return to Welcome Screen)
+  // Exit App handler (return to Welcome Screen as new session)
   const handleExitApp = () => {
-    setAppPhase("welcome");
+    setIsOnboarded(false);
+    setStudentName("Little Bunny");
+    setStudentEmail("");
+    setSelectedCourseId("general");
     setSelectedSemesterId(null);
     setSelectedSubjectId(null);
     setIsAdmin(false);
     setActiveTab("semesters");
-    pushAppHistory(selectedCourseId, null, null, "semesters", "welcome");
+    setAppPhase("welcome");
+
+    localStorage.removeItem("read_rabbit_onboarded");
+    localStorage.removeItem("read_rabbit_student_name");
+    localStorage.removeItem("read_rabbit_student_email");
+    localStorage.removeItem("read_rabbit_selected_course_id");
+    localStorage.removeItem("read_rabbit_selected_semester_id");
+    localStorage.removeItem("read_rabbit_selected_subject_id");
+    localStorage.removeItem("read_rabbit_active_tab");
+    localStorage.removeItem("read_rabbit_app_phase");
+    localStorage.removeItem("read_rabbit_is_admin");
+    localStorage.removeItem("read_rabbit_downloaded_materials_v1");
+
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
   };
 
   // 1. Loading Screen (shown first on page open)
@@ -1190,8 +1297,8 @@ export default function App() {
   if (appPhase === "profile_entry") {
     return (
       <StudentEntry
-        initialName=""
-        initialEmail=""
+        initialName={studentName === "Little Bunny" ? "" : studentName}
+        initialEmail={studentEmail}
         onSubmit={handleProfileSubmit}
         onBack={() => setAppPhase("welcome")}
       />

@@ -72,7 +72,15 @@ export default function SubjectHub({
   onUpdateSubject,
   onSendNotification,
 }: SubjectHubProps) {
-  const [activeTab, setActiveTab] = useState<"syllabus" | "materials" | "quiz">("syllabus");
+  const [activeTab, setActiveTab] = useState<"syllabus" | "materials" | "quiz">(() => {
+    const saved = localStorage.getItem(`read_rabbit_subject_tab_${subject.id}`);
+    if (saved === "syllabus" || saved === "materials" || saved === "quiz") return saved;
+    return "syllabus";
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`read_rabbit_subject_tab_${subject.id}`, activeTab);
+  }, [activeTab, subject.id]);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
 
   // Material Details modal
@@ -175,7 +183,7 @@ export default function SubjectHub({
     return units
       .filter(u => u.id !== unitIdToDelete)
       .map(u => {
-        if (u.children && u.children.length > 0) {
+        if (u.children && Array.isArray(u.children)) {
           return {
             ...u,
             children: removeUnitFromTree(u.children, unitIdToDelete)
@@ -267,7 +275,7 @@ export default function SubjectHub({
     if (subject.units && subject.units.length > 0) {
       // If Lang 2, ensure language units and their children are present
       if (isLang2Subject) {
-        const hasNestedChildren = subject.units.some(u => u.children && u.children.length > 0);
+        const hasNestedChildren = subject.units.some(u => Array.isArray(u.children));
         if (!hasNestedChildren && lang2Options.length > 0) {
           return lang2Options.map(lo => ({
             id: lo.id,
@@ -1503,40 +1511,8 @@ export default function SubjectHub({
 
       let children = defaultChildren;
 
-      if (existingLangUnit && Array.isArray(existingLangUnit.children) && existingLangUnit.children.length > 0) {
-        const rawChildren = existingLangUnit.children;
-        const tbCard = rawChildren.find(c => c.kind === "textbook" || c.name.toLowerCase().includes("textbook")) || defaultChildren[0];
-
-        const nonTbCards = rawChildren.filter(c => c !== tbCard && c.kind !== "textbook" && !c.name.toLowerCase().includes("textbook"));
-
-        const poemsCard: Unit = {
-          ...(nonTbCards[0] || defaultChildren[1]),
-          id: nonTbCards[0]?.id || `${subject.id}_${lang.code}_poems`,
-          number: "01",
-          name: "Poems",
-          description: nonTbCards[0]?.description && !nonTbCards[0].description.includes("Chapter") ? nonTbCards[0].description : `${lang.name} Prescribed Poems & Literary Verses`,
-          kind: "chapter"
-        };
-
-        const lessonsCard: Unit = {
-          ...(nonTbCards[1] || defaultChildren[2]),
-          id: nonTbCards[1]?.id || `${subject.id}_${lang.code}_lessons`,
-          number: "02",
-          name: "Lessons",
-          description: nonTbCards[1]?.description && !nonTbCards[1].description.includes("Chapter") ? nonTbCards[1].description : `${lang.name} Prescribed Lessons & Prose`,
-          kind: "chapter"
-        };
-
-        const essaysCard: Unit = {
-          ...(nonTbCards[2] || defaultChildren[3]),
-          id: nonTbCards[2]?.id || `${subject.id}_${lang.code}_essays`,
-          number: "03",
-          name: "Essays",
-          description: nonTbCards[2]?.description && !nonTbCards[2].description.includes("Chapter") ? nonTbCards[2].description : `${lang.name} Prescribed Essays & Composition`,
-          kind: "chapter"
-        };
-
-        children = [tbCard, poemsCard, lessonsCard, essaysCard];
+      if (existingLangUnit && Array.isArray(existingLangUnit.children)) {
+        children = existingLangUnit.children;
       }
 
       return {

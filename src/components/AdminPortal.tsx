@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Course, Subject, Semester, Unit, StudyMaterial, AppNotification, StudentFeedback, FeedbackStatus } from "../types";
+import { Course, Subject, Semester, Unit, StudyMaterial, AppNotification, StudentFeedback, FeedbackStatus, StudentVisitor } from "../types";
 import { uploadFileToSupabaseStorage, deleteFileFromSupabaseStorage, insertMaterialToSupabaseDB, deleteMaterialFromSupabase, supabase } from "../lib/supabase";
+import { loadStudentVisitorsFromFirestore, deleteStudentVisitorFromFirestore } from "../lib/firebase";
 import { 
   ShieldCheck, 
   Lock, 
@@ -45,7 +46,10 @@ import {
   CornerDownRight,
   GraduationCap,
   Lightbulb,
-  Bug
+  Bug,
+  UserCheck,
+  Activity,
+  FileSpreadsheet
 } from "lucide-react";
 
 interface AdminPortalProps {
@@ -86,8 +90,8 @@ export default function AdminPortal({
   const [loginError, setLoginError] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
-  // Admin Dashboard main tab state: 'curriculum' | 'uploads' | 'sync' | 'semesters' | 'notifications' | 'feedback' | 'security'
-  const [activeAdminTab, setActiveAdminTab] = useState<"curriculum" | "uploads" | "sync" | "semesters" | "notifications" | "feedback" | "security">("curriculum");
+  // Admin Dashboard main tab state: 'curriculum' | 'uploads' | 'sync' | 'semesters' | 'notifications' | 'feedback' | 'visitors' | 'security'
+  const [activeAdminTab, setActiveAdminTab] = useState<"curriculum" | "uploads" | "sync" | "semesters" | "notifications" | "feedback" | "visitors" | "security">("curriculum");
 
   // Admin Uploads Directory States
   const [uploadSearch, setUploadSearch] = useState("");
@@ -1085,6 +1089,197 @@ export default function AdminPortal({
     }
   };
 
+  // ==========================================
+  // STUDENT VISITORS & ACCESS DIRECTORY STATES
+  // ==========================================
+  const [visitorsList, setVisitorsList] = useState<StudentVisitor[]>([]);
+  const [isLoadingVisitors, setIsLoadingVisitors] = useState(false);
+  const [visitorSearch, setVisitorSearch] = useState("");
+  const [visitorCourseFilter, setVisitorCourseFilter] = useState("all");
+  const [isDeletingVisitor, setIsDeletingVisitor] = useState<string | null>(null);
+
+  // Fetch visitors from backend and Firestore cloud database
+  const fetchVisitors = async () => {
+    setIsLoadingVisitors(true);
+    try {
+      // 1. Fetch from Firestore
+      const firestoreVisitorsPromise = loadStudentVisitorsFromFirestore().catch(() => []);
+      
+      // 2. Fetch from backend server API
+      const serverVisitorsPromise = fetch("/api/visitors")
+        .then(res => res.json())
+        .then(data => (data && Array.isArray(data.visitors) ? data.visitors : []))
+        .catch(() => []);
+
+      const [firestoreVisitors, serverVisitors] = await Promise.all([
+        firestoreVisitorsPromise,
+        serverVisitorsPromise
+      ]);
+
+      // Combine and deduplicate by email or id
+      const visitorMap = new Map<string, StudentVisitor>();
+
+      // Load server visitors first
+      serverVisitors.forEach((v: StudentVisitor) => {
+        const key = v.email ? v.email.toLowerCase().trim() : (v.id || v.name.toLowerCase().trim());
+        visitorMap.set(key, v);
+      });
+
+      // Overlay with firestore visitors (or add new)
+      firestoreVisitors.forEach((v: StudentVisitor) => {
+        const key = v.email ? v.email.toLowerCase().trim() : (v.id || v.name.toLowerCase().trim());
+        const existing = visitorMap.get(key);
+        if (!existing) {
+          visitorMap.set(key, v);
+        } else {
+          // Merge with highest visit count and latest timestamp
+          visitorMap.set(key, {
+            ...existing,
+            ...v,
+            visitCount: Math.max(existing.visitCount || 1, v.visitCount || 1),
+            lastActiveTimestamp: Math.max(existing.lastActiveTimestamp || 0, v.lastActiveTimestamp || 0),
+            lastActive: (v.lastActiveTimestamp || 0) >= (existing.lastActiveTimestamp || 0) ? v.lastActive : existing.lastActive
+          });
+        }
+      });
+
+      const mergedList = Array.from(visitorMap.values()).sort((a, b) => {
+        return (b.lastActiveTimestamp || 0) - (a.lastActiveTimestamp || 0);
+      });
+
+      setVisitorsList(mergedList);
+    } catch (err) {
+      console.warn("Failed fetching visitors:", err);
+    } finally {
+      setIsLoadingVisitors(false);
+    }
+  };
+
+  // Auto-fetch visitors when admin tab is opened or active
+  React.useEffect(() => {
+    if (activeAdminTab === "visitors" || isAdmin) {
+      fetchVisitors();
+    }
+  }, [activeAdminTab, isAdmin]);
+
+  // Derived visitor statistics
+  const totalVisitorsCount = visitorsList.length;
+
+  const totalSessionsCount = React.useMemo(() => {
+    return visitorsList.reduce((acc, v) => acc + (v.visitCount || 1), 0);
+  }, [visitorsList]);
+
+  const verifiedEmailCount = React.useMemo(() => {
+    return visitorsList.filter(v => v.email && v.email.includes("@")).length;
+  }, [visitorsList]);
+
+  const activeTodayCount = React.useMemo(() => {
+    const todayStr = new Date().toLocaleDateString();
+    return visitorsList.filter(v => {
+      if (!v.lastActive) return false;
+      return v.lastActive.includes(todayStr) || (v.lastActiveTimestamp && Date.now() - v.lastActiveTimestamp < 86400000);
+    }).length;
+  }, [visitorsList]);
+
+  // Filtered visitors
+  const filteredVisitors = React.useMemo(() => {
+    return visitorsList.filter(v => {
+      if (visitorCourseFilter !== "all" && v.courseId !== visitorCourseFilter) {
+        return false;
+      }
+      if (visitorSearch.trim()) {
+        const q = visitorSearch.toLowerCase();
+        const matchName = (v.name || "").toLowerCase().includes(q);
+        const matchEmail = (v.email || "").toLowerCase().includes(q);
+        const matchCourse = (v.courseName || "").toLowerCase().includes(q);
+        if (!matchName && !matchEmail && !matchCourse) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [visitorsList, visitorCourseFilter, visitorSearch]);
+
+  // Delete individual visitor record
+  const handleDeleteVisitor = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to remove "${name || "this student"}" from the visitors directory?`)) return;
+    setIsDeletingVisitor(id);
+    try {
+      // 1. Delete from Firestore
+      deleteStudentVisitorFromFirestore(id).catch(e => console.warn(e));
+
+      // 2. Delete from server
+      const res = await fetch(`/api/visitors/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data && Array.isArray(data.visitors)) {
+        setVisitorsList(data.visitors);
+      } else {
+        setVisitorsList(prev => prev.filter(v => v.id !== id));
+      }
+    } catch (err) {
+      console.warn("Failed deleting visitor:", err);
+      setVisitorsList(prev => prev.filter(v => v.id !== id));
+    } finally {
+      setIsDeletingVisitor(null);
+    }
+  };
+
+  // Clear all visitor logs
+  const handleClearAllVisitors = async () => {
+    if (!window.confirm("Are you sure you want to permanently clear all student visitor logs? This action cannot be reversed.")) return;
+    try {
+      await fetch("/api/visitors", { method: "DELETE" });
+      setVisitorsList([]);
+    } catch (err) {
+      console.warn("Failed clearing visitors:", err);
+    }
+  };
+
+  // Export Visitors to CSV Spreadsheet
+  const handleExportVisitorsCSV = () => {
+    if (visitorsList.length === 0) {
+      alert("No visitor records to export.");
+      return;
+    }
+    const headers = ["ID", "Student Name", "Email Address", "Enrolled Degree Program", "First Joined Timestamp", "Last Active Timestamp", "Total Sessions Count"];
+    const rows = visitorsList.map(v => [
+      `"${v.id}"`,
+      `"${(v.name || "").replace(/"/g, '""')}"`,
+      `"${(v.email || "").replace(/"/g, '""')}"`,
+      `"${(v.courseName || v.courseId || "BCA").replace(/"/g, '""')}"`,
+      `"${(v.firstVisit || "").replace(/"/g, '""')}"`,
+      `"${(v.lastActive || "").replace(/"/g, '""')}"`,
+      v.visitCount || 1
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `readrabbit_student_visitors_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export Visitors to JSON
+  const handleExportVisitorsJSON = () => {
+    if (visitorsList.length === 0) {
+      alert("No visitor records to export.");
+      return;
+    }
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(visitorsList, null, 2));
+      const downloadAnchor = document.createElement("a");
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `readrabbit_student_visitors_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (e) {
+      alert("Failed to export JSON: " + e);
+    }
+  };
+
   return (
     <div className="flex-1 min-h-screen px-4 md:px-8 py-8 pb-32 text-[#231a0a] font-sans">
       {/* Login Screen if not Admin */}
@@ -1222,6 +1417,7 @@ export default function AdminPortal({
             {[
               { id: "curriculum", label: "Curriculum Editor", icon: BookOpen },
               { id: "uploads", label: "Uploaded Files Directory", icon: FolderPlus },
+              { id: "visitors", label: "Visitors & Students Directory", icon: Users, badge: totalVisitorsCount },
               { id: "sync", label: "Cross-Device Sync & Backup", icon: RefreshCw },
               { id: "semesters", label: "Manage Semesters", icon: Layers },
               { id: "notifications", label: "Dispatch Board", icon: Bell },
@@ -2535,6 +2731,261 @@ export default function AdminPortal({
                   Change Admin Password
                 </button>
               </form>
+            </div>
+          )}
+
+          {/* STUDENT VISITORS & ACCESS DIRECTORY VIEW */}
+          {activeAdminTab === "visitors" && (
+            <div className="space-y-6">
+              
+              {/* Top Banner & Control Bar */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl border border-[#dac1c1]/20 shadow-xs">
+                <div>
+                  <h3 className="text-lg font-extrabold text-[#40010d] flex items-center gap-2">
+                    <Users size={22} className="text-[#95491a]" /> Visitors & Students Directory
+                  </h3>
+                  <p className="text-xs text-[#735E55] mt-1">
+                    Real-time roster and activity log of all students accessing the Read Rabbit study portal.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={fetchVisitors}
+                    disabled={isLoadingVisitors}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#FAF3E0] hover:bg-[#e8dbce] text-[#40010d] text-xs font-bold rounded-xl border border-[#dac1c1]/40 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                    title="Refresh latest visitor records"
+                  >
+                    <RefreshCw size={13} className={isLoadingVisitors ? "animate-spin" : ""} />
+                    <span>Refresh</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleExportVisitorsCSV}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-200/60 transition-all cursor-pointer shadow-2xs"
+                    title="Export visitor directory as CSV spreadsheet"
+                  >
+                    <FileSpreadsheet size={13} />
+                    <span>Export CSV</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleExportVisitorsJSON}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-[#FAF3E0] hover:bg-[#e8dbce] text-[#40010d] text-xs font-bold rounded-xl border border-[#dac1c1]/40 transition-all cursor-pointer shadow-2xs"
+                    title="Export raw JSON data"
+                  >
+                    <Download size={13} />
+                    <span>Export JSON</span>
+                  </button>
+
+                  {visitorsList.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearAllVisitors}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                      title="Clear visitor logs"
+                    >
+                      <Trash2 size={13} />
+                      <span className="hidden sm:inline">Clear All</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 4 Stat Overview Metric Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white p-4.5 rounded-2xl border border-[#dac1c1]/20 shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-[#877272] uppercase tracking-wider">Total Registered Students</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-extrabold text-[#40010d]">{totalVisitorsCount}</span>
+                    <span className="text-[11px] text-[#877272]">students</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4.5 rounded-2xl border border-[#dac1c1]/20 shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-[#877272] uppercase tracking-wider">Total Study Sessions</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-extrabold text-[#95491a]">{totalSessionsCount}</span>
+                    <span className="text-[11px] text-[#877272]">visits</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4.5 rounded-2xl border border-[#dac1c1]/20 shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-[#877272] uppercase tracking-wider">Active Recently</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-extrabold text-emerald-700">{activeTodayCount}</span>
+                    <span className="text-[11px] text-emerald-600 font-bold">online / today</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4.5 rounded-2xl border border-[#dac1c1]/20 shadow-2xs space-y-1">
+                  <span className="text-[11px] font-bold text-[#877272] uppercase tracking-wider">Verified Email Addresses</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-extrabold text-blue-700">{verifiedEmailCount}</span>
+                    <span className="text-[11px] text-blue-600 font-bold">verified</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filters and Search Toolbar */}
+              <div className="bg-white p-4 rounded-2xl border border-[#dac1c1]/20 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                <div className="relative flex-1">
+                  <Search size={15} className="absolute left-3 top-3 text-[#877272]" />
+                  <input
+                    type="text"
+                    value={visitorSearch}
+                    onChange={(e) => setVisitorSearch(e.target.value)}
+                    placeholder="Search students by name, email address, or enrolled degree program..."
+                    className="w-full pl-9 pr-3 py-2 bg-[#fff8f3]/60 border border-[#dac1c1] focus:border-[#fd9b65] focus:bg-white rounded-xl text-xs focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={visitorCourseFilter}
+                    onChange={(e) => setVisitorCourseFilter(e.target.value)}
+                    className="bg-[#fff8f3]/60 border border-[#dac1c1] focus:border-[#fd9b65] rounded-xl px-3 py-2 text-xs font-bold text-[#40010d] focus:outline-none"
+                  >
+                    <option value="all">All Degree Programs</option>
+                    {courses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Visitor Records List */}
+              <div className="bg-white rounded-3xl border border-[#dac1c1]/20 shadow-2xs overflow-hidden">
+                {isLoadingVisitors && visitorsList.length === 0 ? (
+                  <div className="p-12 text-center space-y-3">
+                    <RefreshCw size={28} className="animate-spin mx-auto text-[#95491a]" />
+                    <p className="text-xs font-bold text-[#877272]">Loading student visitors directory...</p>
+                  </div>
+                ) : filteredVisitors.length === 0 ? (
+                  <div className="p-12 text-center space-y-3">
+                    <div className="w-14 h-14 bg-[#FAF3E0] text-[#95491a] rounded-2xl mx-auto flex items-center justify-center">
+                      <Users size={28} />
+                    </div>
+                    <h4 className="text-base font-extrabold text-[#40010d]">No Student Records Found</h4>
+                    <p className="text-xs text-[#735E55] max-w-sm mx-auto">
+                      {visitorSearch || visitorCourseFilter !== "all"
+                        ? "No students match your active search filter."
+                        : "When students enter their name and email on the welcome/profile screen, their names, login counts, and timestamps will appear here in real-time."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-[#FAF3E0]/70 border-b border-[#dac1c1]/40 text-[#40010d] font-extrabold uppercase text-[10px] tracking-wider">
+                          <th className="py-3.5 px-4">#</th>
+                          <th className="py-3.5 px-4">Student Name</th>
+                          <th className="py-3.5 px-4">Email Address</th>
+                          <th className="py-3.5 px-4">Enrolled Program</th>
+                          <th className="py-3.5 px-4">First Joined</th>
+                          <th className="py-3.5 px-4">Last Active</th>
+                          <th className="py-3.5 px-4 text-center">Sessions</th>
+                          <th className="py-3.5 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#dac1c1]/20">
+                        {filteredVisitors.map((student, idx) => {
+                          const initials = (student.name || "Student")
+                            .split(" ")
+                            .map((p) => p[0])
+                            .slice(0, 2)
+                            .join("")
+                            .toUpperCase();
+                          const isDeleting = isDeletingVisitor === student.id;
+
+                          return (
+                            <tr key={student.id} className="hover:bg-[#fff8f3]/60 transition-colors">
+                              <td className="py-3.5 px-4 font-mono text-[11px] text-[#877272]">
+                                {idx + 1}
+                              </td>
+
+                              <td className="py-3.5 px-4">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-full bg-[#FAF3E0] text-[#95491a] border border-[#dac1c1]/40 flex items-center justify-center font-black text-xs shrink-0">
+                                    {initials}
+                                  </div>
+                                  <div>
+                                    <span className="font-extrabold text-xs text-[#40010d] block">
+                                      {student.name || "Student"}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-4">
+                                {student.email ? (
+                                  <a
+                                    href={`mailto:${student.email}`}
+                                    className="text-xs text-blue-700 hover:underline flex items-center gap-1 font-mono"
+                                  >
+                                    <Mail size={12} className="text-gray-400" />
+                                    <span>{student.email}</span>
+                                  </a>
+                                ) : (
+                                  <span className="text-[11px] text-gray-400 italic">Not provided</span>
+                                )}
+                              </td>
+
+                              <td className="py-3.5 px-4">
+                                <span className="inline-block px-2.5 py-1 bg-[#fff2e1] text-[#95491a] font-bold text-[11px] rounded-lg border border-[#dac1c1]/40">
+                                  {student.courseName || student.courseId || "BCA General"}
+                                </span>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-[11px] text-[#735E55] whitespace-nowrap">
+                                {student.firstVisit || "—"}
+                              </td>
+
+                              <td className="py-3.5 px-4 text-[11px] text-[#735E55] whitespace-nowrap">
+                                <span className="font-bold text-[#40010d]">{student.lastActive || "—"}</span>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-center">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
+                                  {student.visitCount || 1} visit{student.visitCount === 1 ? "" : "s"}
+                                </span>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {student.email && (
+                                    <a
+                                      href={`mailto:${student.email}?subject=${encodeURIComponent("Read Rabbit Academic Update")}&body=${encodeURIComponent(`Hi ${student.name},\n\n`)}`}
+                                      className="p-1.5 text-gray-500 hover:text-[#95491a] hover:bg-[#FAF3E0] rounded-lg transition-colors cursor-pointer"
+                                      title="Send email to student"
+                                    >
+                                      <Mail size={14} />
+                                    </a>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteVisitor(student.id, student.name)}
+                                    disabled={isDeleting}
+                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer disabled:opacity-40"
+                                    title="Remove student from roster"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

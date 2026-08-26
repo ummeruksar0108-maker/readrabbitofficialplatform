@@ -9211,7 +9211,11 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
       ];
 
       const makeLangChildren = (langCode: string, langName: string, existingChildren?: Unit[]): Unit[] => {
-        const tbCard: Unit = existingChildren?.find(c => c.kind === "textbook" || c.name?.toLowerCase().includes("textbook")) || {
+        if (existingChildren && Array.isArray(existingChildren)) {
+          return existingChildren;
+        }
+
+        const tbCard: Unit = {
           id: `${course.id}_${langCode}_s${semNum}_tb`,
           number: "00",
           name: "Textbook",
@@ -9221,40 +9225,33 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
           kind: "textbook"
         };
 
-        const ch1 = existingChildren?.find(c => c.number === "01" || c.id?.includes("ch1") || c.name?.toLowerCase().includes("poem"));
-        const ch2 = existingChildren?.find(c => c.number === "02" || c.id?.includes("ch2") || c.name?.toLowerCase().includes("lesson"));
-        const ch3 = existingChildren?.find(c => c.number === "03" || c.id?.includes("ch3") || c.name?.toLowerCase().includes("essay"));
-
         const poemsCard: Unit = {
-          ...(ch1 || {}),
-          id: ch1?.id || `${course.id}_${langCode}_s${semNum}_poems`,
+          id: `${course.id}_${langCode}_s${semNum}_poems`,
           number: "01",
           name: "Poems",
-          description: ch1?.description && !ch1.description.includes("Chapter") ? ch1.description : `${langName} Prescribed Poems & Literary Verses`,
-          masteryPercent: ch1?.masteryPercent || 0,
-          status: ch1?.status || "Locked",
+          description: `${langName} Prescribed Poems & Literary Verses`,
+          masteryPercent: 0,
+          status: "Locked",
           kind: "chapter"
         };
 
         const lessonsCard: Unit = {
-          ...(ch2 || {}),
-          id: ch2?.id || `${course.id}_${langCode}_s${semNum}_lessons`,
+          id: `${course.id}_${langCode}_s${semNum}_lessons`,
           number: "02",
           name: "Lessons",
-          description: ch2?.description && !ch2.description.includes("Chapter") ? ch2.description : `${langName} Prescribed Lessons & Prose`,
-          masteryPercent: ch2?.masteryPercent || 0,
-          status: ch2?.status || "Locked",
+          description: `${langName} Prescribed Lessons & Prose`,
+          masteryPercent: 0,
+          status: "Locked",
           kind: "chapter"
         };
 
         const essaysCard: Unit = {
-          ...(ch3 || {}),
-          id: ch3?.id || `${course.id}_${langCode}_s${semNum}_essays`,
+          id: `${course.id}_${langCode}_s${semNum}_essays`,
           number: "03",
           name: "Essays",
-          description: ch3?.description && !ch3.description.includes("Chapter") ? ch3.description : `${langName} Prescribed Essays & Composition`,
-          masteryPercent: ch3?.masteryPercent || 0,
-          status: ch3?.status || "Locked",
+          description: `${langName} Prescribed Essays & Composition`,
+          masteryPercent: 0,
+          status: "Locked",
           kind: "chapter"
         };
 

@@ -126,3 +126,15 @@ export interface StudentFeedback {
   createdAt: number;
 }
 
+export interface StudentVisitor {
+  id: string;
+  name: string;
+  email: string;
+  courseId?: string;
+  courseName?: string;
+  firstVisit: string;
+  lastActive: string;
+  visitCount: number;
+  lastActiveTimestamp: number;
+}
+

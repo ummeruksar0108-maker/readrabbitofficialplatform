@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { StudyMaterial } from "../types";
 import { Book, Bookmark, Settings, Check, User, Mail, Target, Compass, Sparkles, Sliders, Palette } from "lucide-react";
+import { saveStudentVisitorToFirestore } from "../lib/firebase";
 
 // Types for ExtraTabs
 interface ExtraTabsProps {
@@ -22,8 +23,6 @@ export const bgPresets = [
   { id: "sage", name: "Sage Matcha", hex: "#F2F5F1", desc: "Calm green tea" },
   { id: "blush", name: "Blush Velvet", hex: "#FAF0F2", desc: "Subtle soft rose" },
   { id: "sky", name: "Misty Slate", hex: "#F0F4F8", desc: "Clean slate blue" },
-  { id: "midnight", name: "Midnight Espresso", hex: "#120C0B", desc: "Dark coffee roast" },
-  { id: "obsidian", name: "Velvet Obsidian", hex: "#0B0B0C", desc: "Deep dark luxury" },
 ];
 
 export default function ExtraTabs({
@@ -42,14 +41,40 @@ export default function ExtraTabs({
   const [activeMood, setActiveMood] = useState("Focus Burrow");
   const [isSaved, setIsSaved] = useState(false);
 
+  useEffect(() => {
+    setLocalName(studentName);
+    setLocalEmail(studentEmail);
+  }, [studentName, studentEmail]);
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    setStudentName(localName);
+    const cleanName = localName.trim();
+    const cleanEmail = localEmail.trim();
+
+    setStudentName(cleanName);
     if (setStudentEmail) {
-      setStudentEmail(localEmail);
+      setStudentEmail(cleanEmail);
     }
-    localStorage.setItem("read_rabbit_student_name", localName);
-    localStorage.setItem("read_rabbit_student_email", localEmail);
+    localStorage.setItem("read_rabbit_student_name", cleanName);
+    localStorage.setItem("read_rabbit_student_email", cleanEmail);
+    localStorage.setItem("read_rabbit_onboarded", "true");
+
+    // Persist to Firestore cloud database
+    saveStudentVisitorToFirestore({
+      name: cleanName,
+      email: cleanEmail
+    }).catch(err => console.warn("Settings Firestore sync error:", err));
+
+    // Also send to backend API
+    fetch("/api/visitors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: cleanName,
+        email: cleanEmail
+      })
+    }).catch(err => console.warn("Settings visitor sync error:", err));
+
     setIsSaved(true);
     setTimeout(() => {
       setIsSaved(false);
@@ -239,8 +264,6 @@ export default function ExtraTabs({
               ))}
             </div>
           </div>
-
-
 
           <div className="pt-6 border-t border-[#dac1c1]/30 flex justify-end">
             <button
