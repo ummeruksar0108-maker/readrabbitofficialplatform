@@ -807,7 +807,7 @@ export default function App() {
     if (!userEmail) return false;
     const adminEmail = (import.meta.env.VITE_ADMIN_EMAIL || "thecodeorbitoffi@gmail.com").trim().toLowerCase();
     const clean = userEmail.trim().toLowerCase();
-    return clean === adminEmail || clean === "thecodeorbitoffi@gmail.com" || clean === "admin@readrabbit.com" || clean === "admin";
+    return clean === adminEmail || clean === "thecodeorbitoffi@gmail.com" || clean === "admin@readrabbit.com" || clean === "admin" || clean === "ummeruksar0108@gmail.com";
   };
 
   // Sync Supabase Auth session with isAdmin state & handle Password Recovery

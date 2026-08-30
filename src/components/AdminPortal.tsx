@@ -1107,8 +1107,11 @@ export default function AdminPortal({
       
       // 2. Fetch from backend server API
       const serverVisitorsPromise = fetch("/api/visitors")
-        .then(res => res.json())
-        .then(data => (data && Array.isArray(data.visitors) ? data.visitors : []))
+        .then(async (res) => {
+          if (!res.ok) return [];
+          const data = await res.json();
+          return data && Array.isArray(data.visitors) ? data.visitors : [];
+        })
         .catch(() => []);
 
       const [firestoreVisitors, serverVisitors] = await Promise.all([

@@ -81,22 +81,48 @@ const NOTIFICATIONS_FILE = path.join(DATA_DIR, "notifications.json");
 const FEEDBACK_FILE = path.join(DATA_DIR, "feedback.json");
 const VISITORS_FILE = path.join(DATA_DIR, "visitors.json");
 
+// Safe JSON reading helper that never throws on empty or corrupted files
+async function safeReadJson<T>(filePath: string, defaultValue: T): Promise<T> {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return defaultValue;
+    }
+    const raw = await fsPromises.readFile(filePath, "utf-8");
+    if (!raw || !raw.trim()) {
+      return defaultValue;
+    }
+    return JSON.parse(raw) as T;
+  } catch (err: any) {
+    console.warn(`[SERVER JSON SAFE-READ] Handled invalid/empty JSON in ${path.basename(filePath)}: ${err?.message || err}`);
+    return defaultValue;
+  }
+}
+
+// Atomic JSON write helper to prevent partial-file read race conditions
+async function safeWriteJson(filePath: string, data: any): Promise<void> {
+  const jsonString = JSON.stringify(data, null, 2);
+  const tempPath = `${filePath}.tmp.${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  try {
+    await fsPromises.writeFile(tempPath, jsonString, "utf-8");
+    await fsPromises.rename(tempPath, filePath);
+  } catch (err) {
+    // Direct write fallback
+    await fsPromises.writeFile(filePath, jsonString, "utf-8");
+  }
+}
+
 // GET /api/visitors - Retrieve all logged student visitors and total count
 app.get("/api/visitors", async (req, res) => {
   try {
-    if (fs.existsSync(VISITORS_FILE)) {
-      const data = await fsPromises.readFile(VISITORS_FILE, "utf-8");
-      const visitors = JSON.parse(data);
-      return res.json({
-        success: true,
-        totalCount: Array.isArray(visitors) ? visitors.length : 0,
-        visitors: Array.isArray(visitors) ? visitors : []
-      });
-    }
-    return res.json({ success: true, totalCount: 0, visitors: [] });
+    const visitors = await safeReadJson<any[]>(VISITORS_FILE, []);
+    return res.json({
+      success: true,
+      totalCount: Array.isArray(visitors) ? visitors.length : 0,
+      visitors: Array.isArray(visitors) ? visitors : []
+    });
   } catch (error: any) {
     console.error("[SERVER VISITORS ERROR]", error);
-    return res.status(500).json({ error: "Failed to read visitors log" });
+    return res.json({ success: true, totalCount: 0, visitors: [] });
   }
 });
 
@@ -108,15 +134,7 @@ app.post("/api/visitors", async (req, res) => {
       return res.json({ success: false, message: "Ignored default guest name" });
     }
 
-    let visitors: any[] = [];
-    if (fs.existsSync(VISITORS_FILE)) {
-      try {
-        const data = await fsPromises.readFile(VISITORS_FILE, "utf-8");
-        visitors = JSON.parse(data);
-      } catch (e) {
-        visitors = [];
-      }
-    }
+    const visitors = await safeReadJson<any[]>(VISITORS_FILE, []);
 
     const cleanEmail = (email || "").trim().toLowerCase();
     const cleanName = (name || "").trim();
@@ -161,7 +179,7 @@ app.post("/api/visitors", async (req, res) => {
       console.log(`[SERVER VISITOR] New student visitor registered: "${cleanName}" (${cleanEmail || "no email"})`);
     }
 
-    await fsPromises.writeFile(VISITORS_FILE, JSON.stringify(visitors, null, 2));
+    await safeWriteJson(VISITORS_FILE, visitors);
     return res.json({
       success: true,
       totalCount: visitors.length,
@@ -177,13 +195,9 @@ app.post("/api/visitors", async (req, res) => {
 app.delete("/api/visitors/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    let visitors: any[] = [];
-    if (fs.existsSync(VISITORS_FILE)) {
-      const data = await fsPromises.readFile(VISITORS_FILE, "utf-8");
-      visitors = JSON.parse(data);
-    }
+    let visitors = await safeReadJson<any[]>(VISITORS_FILE, []);
     visitors = visitors.filter((v: any) => v.id !== id);
-    await fsPromises.writeFile(VISITORS_FILE, JSON.stringify(visitors, null, 2));
+    await safeWriteJson(VISITORS_FILE, visitors);
     return res.json({ success: true, totalCount: visitors.length, visitors });
   } catch (error: any) {
     return res.status(500).json({ error: "Failed to delete visitor" });
@@ -193,7 +207,7 @@ app.delete("/api/visitors/:id", async (req, res) => {
 // DELETE /api/visitors - Clear all visitors log (Admin only)
 app.delete("/api/visitors", async (req, res) => {
   try {
-    await fsPromises.writeFile(VISITORS_FILE, JSON.stringify([], null, 2));
+    await safeWriteJson(VISITORS_FILE, []);
     return res.json({ success: true, totalCount: 0, visitors: [] });
   } catch (error: any) {
     return res.status(500).json({ error: "Failed to clear visitors log" });
@@ -202,13 +216,10 @@ app.delete("/api/visitors", async (req, res) => {
 
 app.get("/api/notifications", async (req, res) => {
   try {
-    if (fs.existsSync(NOTIFICATIONS_FILE)) {
-      const data = await fsPromises.readFile(NOTIFICATIONS_FILE, "utf-8");
-      return res.json(JSON.parse(data));
-    }
-    return res.json([]);
+    const notifs = await safeReadJson<any[]>(NOTIFICATIONS_FILE, []);
+    return res.json(notifs);
   } catch (error) {
-    return res.status(500).json({ error: "Failed to read notifications" });
+    return res.json([]);
   }
 });
 
@@ -216,21 +227,13 @@ app.get("/api/notifications", async (req, res) => {
 app.post("/api/notifications", async (req, res) => {
   try {
     const newNotif = req.body;
-    let currentNotifs: any[] = [];
-    if (fs.existsSync(NOTIFICATIONS_FILE)) {
-      try {
-        const data = await fsPromises.readFile(NOTIFICATIONS_FILE, "utf-8");
-        currentNotifs = JSON.parse(data);
-      } catch (e) {
-        currentNotifs = [];
-      }
-    }
+    let currentNotifs = await safeReadJson<any[]>(NOTIFICATIONS_FILE, []);
     if (Array.isArray(newNotif)) {
       currentNotifs = newNotif;
     } else if (newNotif && newNotif.title) {
       currentNotifs = [newNotif, ...currentNotifs];
     }
-    await fsPromises.writeFile(NOTIFICATIONS_FILE, JSON.stringify(currentNotifs, null, 2));
+    await safeWriteJson(NOTIFICATIONS_FILE, currentNotifs);
     console.log(`[SERVER NOTIFICATION BROADCAST] Saved notification broadcast to disk (${currentNotifs.length} total).`);
     return res.json({ success: true, notifications: currentNotifs });
   } catch (error: any) {
@@ -241,13 +244,10 @@ app.post("/api/notifications", async (req, res) => {
 // GET /api/feedback - Retrieve all student feedback
 app.get("/api/feedback", async (req, res) => {
   try {
-    if (fs.existsSync(FEEDBACK_FILE)) {
-      const data = await fsPromises.readFile(FEEDBACK_FILE, "utf-8");
-      return res.json(JSON.parse(data));
-    }
-    return res.json([]);
+    const feedback = await safeReadJson<any[]>(FEEDBACK_FILE, []);
+    return res.json(feedback);
   } catch (error) {
-    return res.status(500).json({ error: "Failed to read student feedback" });
+    return res.json([]);
   }
 });
 
@@ -255,15 +255,7 @@ app.get("/api/feedback", async (req, res) => {
 app.post("/api/feedback", async (req, res) => {
   try {
     const payload = req.body;
-    let feedbackList: any[] = [];
-    if (fs.existsSync(FEEDBACK_FILE)) {
-      try {
-        const data = await fsPromises.readFile(FEEDBACK_FILE, "utf-8");
-        feedbackList = JSON.parse(data);
-      } catch (e) {
-        feedbackList = [];
-      }
-    }
+    let feedbackList = await safeReadJson<any[]>(FEEDBACK_FILE, []);
 
     if (Array.isArray(payload)) {
       feedbackList = payload;
@@ -285,7 +277,7 @@ app.post("/api/feedback", async (req, res) => {
       feedbackList = [newFeedback, ...feedbackList.filter(f => f.id !== newFeedback.id)];
     }
 
-    await fsPromises.writeFile(FEEDBACK_FILE, JSON.stringify(feedbackList, null, 2));
+    await safeWriteJson(FEEDBACK_FILE, feedbackList);
     console.log(`[SERVER FEEDBACK] Successfully saved student feedback to disk (${feedbackList.length} total entries).`);
     return res.json({ success: true, feedback: feedbackList });
   } catch (error: any) {
@@ -299,11 +291,7 @@ app.patch("/api/feedback/:id", async (req, res) => {
   try {
     const feedbackId = req.params.id;
     const { status, adminNote } = req.body;
-    let feedbackList: any[] = [];
-    if (fs.existsSync(FEEDBACK_FILE)) {
-      const data = await fsPromises.readFile(FEEDBACK_FILE, "utf-8");
-      feedbackList = JSON.parse(data);
-    }
+    let feedbackList = await safeReadJson<any[]>(FEEDBACK_FILE, []);
     const target = feedbackList.find(f => f.id === feedbackId);
     if (!target) {
       return res.status(404).json({ error: "Feedback item not found" });
@@ -311,7 +299,7 @@ app.patch("/api/feedback/:id", async (req, res) => {
     if (status !== undefined) target.status = status;
     if (adminNote !== undefined) target.adminNote = adminNote;
 
-    await fsPromises.writeFile(FEEDBACK_FILE, JSON.stringify(feedbackList, null, 2));
+    await safeWriteJson(FEEDBACK_FILE, feedbackList);
     return res.json({ success: true, item: target });
   } catch (error: any) {
     return res.status(500).json({ error: "Failed to update feedback item" });
@@ -322,13 +310,9 @@ app.patch("/api/feedback/:id", async (req, res) => {
 app.delete("/api/feedback/:id", async (req, res) => {
   try {
     const feedbackId = req.params.id;
-    let feedbackList: any[] = [];
-    if (fs.existsSync(FEEDBACK_FILE)) {
-      const data = await fsPromises.readFile(FEEDBACK_FILE, "utf-8");
-      feedbackList = JSON.parse(data);
-    }
+    let feedbackList = await safeReadJson<any[]>(FEEDBACK_FILE, []);
     feedbackList = feedbackList.filter(f => f.id !== feedbackId);
-    await fsPromises.writeFile(FEEDBACK_FILE, JSON.stringify(feedbackList, null, 2));
+    await safeWriteJson(FEEDBACK_FILE, feedbackList);
     return res.json({ success: true, feedback: feedbackList });
   } catch (error: any) {
     return res.status(500).json({ error: "Failed to delete feedback item" });
