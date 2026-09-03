@@ -4,6 +4,7 @@ import { Subject, Unit, StudyMaterial, YouTubeReference } from "../types";
 import { getFileFromIndexedDB, base64ToBlob } from "../lib/fileStorage";
 import { getFileContentFromCloud, logDiagnostic } from "../lib/firebase";
 import { uploadFileToSupabaseStorage, deleteFileFromSupabaseStorage, insertMaterialToSupabaseDB, fetchMaterialsFromSupabaseDB, deleteMaterialFromSupabase, UploadResult } from "../lib/supabase";
+import { addDeletedCardId, isCardDeleted } from "../lib/deletedCards";
 import { 
   ChevronRight, 
   BookOpen, 
@@ -414,6 +415,18 @@ export default function SubjectHub({
       return;
     }
     if (!window.confirm(`Are you sure you want to delete "${unitToDelete.name}"? This action cannot be undone.`)) return;
+
+    // Track this unit and all of its nested children as deleted
+    const collectUnitIds = (u: Unit): string[] => {
+      const ids = [u.id];
+      if (u.children && Array.isArray(u.children)) {
+        for (const child of u.children) {
+          ids.push(...collectUnitIds(child));
+        }
+      }
+      return ids;
+    };
+    addDeletedCardId(collectUnitIds(unitToDelete));
 
     const baseUnits = getBaseUnitsForOperations();
     const updatedUnits = removeUnitFromTree(baseUnits, unitToDelete.id);
@@ -865,6 +878,7 @@ export default function SubjectHub({
     const targetCloudPath = targetInfo?.material?.cloudPath;
 
     // Attempt deletion from Supabase Storage & DB
+    addDeletedCardId(materialId);
     try {
       await deleteMaterialFromSupabase(materialId, targetCloudPath);
     } catch (delErr) {
@@ -894,6 +908,7 @@ export default function SubjectHub({
     const targetInfo = findMaterialInTree(subject, baseUnits, materialId);
     const targetCloudPath = targetInfo?.material?.cloudPath;
     
+    addDeletedCardId(materialId);
     try {
       await deleteMaterialFromSupabase(materialId, targetCloudPath);
     } catch (delErr) {
@@ -922,6 +937,7 @@ export default function SubjectHub({
     const targetInfo = findMaterialInTree(subject, baseUnits, materialId);
     const targetCloudPath = targetInfo?.material?.cloudPath;
     
+    addDeletedCardId(materialId);
     try {
       await deleteMaterialFromSupabase(materialId, targetCloudPath);
     } catch (delErr) {
@@ -1437,7 +1453,7 @@ export default function SubjectHub({
   const displayUnits = useMemo(() => {
     if (isLabSubject) {
       if (subject.units && subject.units.length > 0) {
-        return subject.units;
+        return subject.units.filter(u => !isCardDeleted(u.id));
       }
       const requiredLabSections = [
         { name: "Manual", desc: "Comprehensive Laboratory Manual, experiment procedures, and theoretical instructions." },
@@ -1445,23 +1461,25 @@ export default function SubjectHub({
         { name: "Viva Questions", desc: "Essential viva voce questions, practical exam interview Q&A, and lab quizzes." }
       ];
 
-      return requiredLabSections.map((sec, idx) => ({
-        id: `${subject.id}_lab_${idx + 1}`,
-        number: `0${idx + 1}`,
-        name: sec.name,
-        description: `${subject.name} - ${sec.desc}`,
-        masteryPercent: 0,
-        status: "In Progress" as const,
-        materials: [],
-        importantQuestions: [],
-        youtubeLinks: []
-      }));
+      return requiredLabSections
+        .map((sec, idx) => ({
+          id: `${subject.id}_lab_${idx + 1}`,
+          number: `0${idx + 1}`,
+          name: sec.name,
+          description: `${subject.name} - ${sec.desc}`,
+          masteryPercent: 0,
+          status: "In Progress" as const,
+          materials: [],
+          importantQuestions: [],
+          youtubeLinks: []
+        }))
+        .filter(u => !isCardDeleted(u.id));
     }
 
     if (isLang1Subject) {
       // Filter out textbook unit (which is displayed separately in the Prescribed Reference section)
       const nonTextbookUnits = (subject.units || []).filter(
-        u => u.kind !== "textbook" && !u.name.toLowerCase().includes("textbook")
+        u => u.kind !== "textbook" && !u.name.toLowerCase().includes("textbook") && !isCardDeleted(u.id)
       );
 
       // If units exist in subject.units, return ALL of them, preserving custom titles and newly added cards!
@@ -1471,20 +1489,22 @@ export default function SubjectHub({
 
       // Default fallback if subject.units is empty
       const chapterNames = ["Chapter 1", "Chapter 2", "Chapter 3", "Chapter 4"];
-      return chapterNames.map((chName, idx) => ({
-        id: `${subject.id}_ch_${idx + 1}`,
-        number: `0${idx + 1}`,
-        name: chName,
-        description: `${subject.name} - ${chName} Study Material & Notes`,
-        masteryPercent: 0,
-        status: "In Progress" as const,
-        materials: [],
-        importantQuestions: [],
-        youtubeLinks: []
-      }));
+      return chapterNames
+        .map((chName, idx) => ({
+          id: `${subject.id}_ch_${idx + 1}`,
+          number: `0${idx + 1}`,
+          name: chName,
+          description: `${subject.name} - ${chName} Study Material & Notes`,
+          masteryPercent: 0,
+          status: "In Progress" as const,
+          materials: [],
+          importantQuestions: [],
+          youtubeLinks: []
+        }))
+        .filter(u => !isCardDeleted(u.id));
     }
 
-    return (subject.units || []).filter(u => !u.name.toLowerCase().includes("textbook") && u.kind !== "textbook");
+    return (subject.units || []).filter(u => !u.name.toLowerCase().includes("textbook") && u.kind !== "textbook" && !isCardDeleted(u.id));
   }, [subject, isLabSubject, isLang1Subject]);
 
   // Language II Options computation: Kannada, Hindi, Additional English
@@ -1495,7 +1515,7 @@ export default function SubjectHub({
       { id: `${subject.id}_kan`, name: "Kannada", code: "kan" },
       { id: `${subject.id}_hin`, name: "Hindi", code: "hin" },
       { id: `${subject.id}_ae`, name: "Additional English", code: "ae" }
-    ];
+    ].filter(l => !isCardDeleted(l.id));
 
     return defaultLangs.map((lang, idx) => {
       const existingLangUnit = (subject.units || []).find(u => 
@@ -1515,6 +1535,9 @@ export default function SubjectHub({
         children = existingLangUnit.children;
       }
 
+      // Filter out any individually deleted child units
+      children = children.filter(c => !isCardDeleted(c.id));
+
       return {
         id: existingLangUnit?.id || `${subject.id}_${lang.code}`,
         name: existingLangUnit?.name || lang.name,
@@ -1523,7 +1546,7 @@ export default function SubjectHub({
         status: existingLangUnit?.status || "In Progress",
         children
       };
-    });
+    }).filter(opt => !isCardDeleted(opt.id));
   }, [subject, isLang2Subject]);
 
   const handleToggleUnitStatus = (unitId: string) => {

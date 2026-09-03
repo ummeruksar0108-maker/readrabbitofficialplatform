@@ -1,4 +1,5 @@
 import { Course, StudyMaterial, Unit } from "./types";
+import { filterDeletedCards, isCardDeleted } from "./lib/deletedCards";
 
 export const initialCourses: Course[] = [
   {
@@ -9146,12 +9147,13 @@ export const initialCourses: Course[] = [
 ];
 
 export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
-  return courses.map((course) => {
+  const result = courses.map((course) => {
     const updatedSemesters = course.semesters.map((sem) => {
       const semNum = sem.id;
       let subjects = [...(sem.subjects || [])];
 
       // 1. English (Language I) Card
+      const englishId = `${course.id}_english_sem${semNum}`;
       let engIdx = subjects.findIndex((s) =>
         s.name.toLowerCase().includes("english") ||
         s.name.toLowerCase().includes("language i") ||
@@ -9161,18 +9163,22 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
       );
 
       if (engIdx >= 0) {
-        subjects[engIdx] = {
-          ...subjects[engIdx],
-          name: "English (Language I)",
-          description: subjects[engIdx].description || `Semester ${semNum} English Language coursework and chapters.`,
-          contentMode: "chapters",
-          icon: "Languages",
-          bgColor: subjects[engIdx].bgColor || "bg-pink-50 text-pink-800",
-          textColor: subjects[engIdx].textColor || "text-pink-800",
-        };
-      } else {
+        if (isCardDeleted(subjects[engIdx].id)) {
+          subjects.splice(engIdx, 1);
+        } else {
+          subjects[engIdx] = {
+            ...subjects[engIdx],
+            name: "English (Language I)",
+            description: subjects[engIdx].description || `Semester ${semNum} English Language coursework and chapters.`,
+            contentMode: "chapters",
+            icon: "Languages",
+            bgColor: subjects[engIdx].bgColor || "bg-pink-50 text-pink-800",
+            textColor: subjects[engIdx].textColor || "text-pink-800",
+          };
+        }
+      } else if (!isCardDeleted(englishId)) {
         subjects.push({
-          id: `${course.id}_english_sem${semNum}`,
+          id: englishId,
           name: "English (Language I)",
           description: `Semester ${semNum} English Language coursework, literature chapters, and grammar.`,
           modulesCount: 4,
@@ -9197,6 +9203,7 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
 
       // 2. Language II Card (Kannada, Hindi, Additional English)
       // Exactly 3 unit cards: Poems (01), Lessons (02), Essays (03), plus Textbook (00)
+      const lang2Id = `${course.id}_lang2_sem${semNum}`;
       let lang2Idx = subjects.findIndex((s) =>
         s.name.toLowerCase().includes("language ii") ||
         s.name.toLowerCase().includes("language 2") ||
@@ -9212,7 +9219,7 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
 
       const makeLangChildren = (langCode: string, langName: string, existingChildren?: Unit[]): Unit[] => {
         if (existingChildren && Array.isArray(existingChildren)) {
-          return existingChildren;
+          return existingChildren.filter(c => !isCardDeleted(c.id));
         }
 
         const tbCard: Unit = {
@@ -9255,48 +9262,69 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
           kind: "chapter"
         };
 
-        return [tbCard, poemsCard, lessonsCard, essaysCard];
+        return [tbCard, poemsCard, lessonsCard, essaysCard].filter(c => !isCardDeleted(c.id));
       };
 
       if (lang2Idx >= 0) {
-        const existingLang2 = subjects[lang2Idx];
-        const existingUnits = existingLang2.units || [];
-        
-        const updatedUnits: Unit[] = defaultLangOptions.map((opt, idx) => {
-          const foundUnit = existingUnits.find(u => 
-            u.name.toLowerCase().includes(opt.name.toLowerCase()) || 
-            u.id.includes(opt.code)
-          );
+        if (isCardDeleted(subjects[lang2Idx].id)) {
+          subjects.splice(lang2Idx, 1);
+        } else {
+          const existingLang2 = subjects[lang2Idx];
+          const existingUnits = existingLang2.units || [];
+          
+          const updatedUnits: Unit[] = defaultLangOptions
+            .filter(opt => !isCardDeleted(`${course.id}_lang2_s${semNum}_${opt.code}`))
+            .map((opt, idx) => {
+              const foundUnit = existingUnits.find(u => 
+                u.name.toLowerCase().includes(opt.name.toLowerCase()) || 
+                u.id.includes(opt.code)
+              );
 
-          return {
-            id: foundUnit?.id || `${course.id}_lang2_s${semNum}_${opt.code}`,
-            number: foundUnit?.number || `0${idx + 1}`,
-            name: foundUnit?.name || opt.name,
-            description: foundUnit?.description || `${opt.name} textbook, poems, lessons, and essays.`,
-            masteryPercent: foundUnit?.masteryPercent || 0,
-            status: foundUnit?.status || "Locked",
-            kind: "language",
-            children: makeLangChildren(opt.code, opt.name, foundUnit?.children)
+              return {
+                id: foundUnit?.id || `${course.id}_lang2_s${semNum}_${opt.code}`,
+                number: foundUnit?.number || `0${idx + 1}`,
+                name: foundUnit?.name || opt.name,
+                description: foundUnit?.description || `${opt.name} textbook, poems, lessons, and essays.`,
+                masteryPercent: foundUnit?.masteryPercent || 0,
+                status: foundUnit?.status || "Locked",
+                kind: (foundUnit?.kind || "language") as Unit["kind"],
+                children: makeLangChildren(opt.code, opt.name, foundUnit?.children)
+              };
+            })
+            .filter(u => !isCardDeleted(u.id));
+
+          subjects[lang2Idx] = {
+            ...existingLang2,
+            name: "Language II",
+            description: "Kannada, Hindi, or Additional English language options.",
+            contentMode: "languages",
+            icon: "Languages",
+            modulesCount: updatedUnits.length,
+            bgColor: existingLang2.bgColor || "bg-purple-50 text-purple-800",
+            textColor: existingLang2.textColor || "text-purple-800",
+            units: updatedUnits
           };
-        });
+        }
+      } else if (!isCardDeleted(lang2Id)) {
+        const initialUnits = defaultLangOptions
+          .filter(opt => !isCardDeleted(`${course.id}_lang2_s${semNum}_${opt.code}`))
+          .map((opt, idx) => ({
+            id: `${course.id}_lang2_s${semNum}_${opt.code}`,
+            number: `0${idx + 1}`,
+            name: opt.name,
+            description: `${opt.name} textbook, poems, lessons, and essays.`,
+            masteryPercent: 0,
+            status: "Locked" as const,
+            kind: "language" as const,
+            children: makeLangChildren(opt.code, opt.name)
+          }))
+          .filter(u => !isCardDeleted(u.id));
 
-        subjects[lang2Idx] = {
-          ...existingLang2,
-          name: "Language II",
-          description: "Kannada, Hindi, or Additional English language options.",
-          contentMode: "languages",
-          icon: "Languages",
-          modulesCount: 3,
-          bgColor: existingLang2.bgColor || "bg-purple-50 text-purple-800",
-          textColor: existingLang2.textColor || "text-purple-800",
-          units: updatedUnits
-        };
-      } else {
         subjects.push({
-          id: `${course.id}_lang2_sem${semNum}`,
+          id: lang2Id,
           name: "Language II",
           description: "Kannada, Hindi, or Additional English language options.",
-          modulesCount: 3,
+          modulesCount: initialUnits.length,
           completedModules: 0,
           difficulty: "Core",
           icon: "Languages",
@@ -9305,16 +9333,7 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
           progressPercent: 0,
           contentMode: "languages",
           textbooks: [],
-          units: defaultLangOptions.map((opt, idx) => ({
-            id: `${course.id}_lang2_s${semNum}_${opt.code}`,
-            number: `0${idx + 1}`,
-            name: opt.name,
-            description: `${opt.name} textbook, poems, lessons, and essays.`,
-            masteryPercent: 0,
-            status: "Locked",
-            kind: "language",
-            children: makeLangChildren(opt.code, opt.name)
-          })),
+          units: initialUnits,
           materials: []
         });
       }
@@ -9330,4 +9349,6 @@ export function ensureAllLanguageCardsExist(courses: Course[]): Course[] {
       semesters: updatedSemesters
     };
   });
+
+  return filterDeletedCards(result);
 }

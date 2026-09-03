@@ -325,7 +325,11 @@ app.get("/api/curriculum", async (req, res) => {
     if (fs.existsSync(CURRICULUM_FILE)) {
       const data = await fsPromises.readFile(CURRICULUM_FILE, "utf-8");
       console.log("[SERVER] Loaded curriculum data from disk.");
-      return res.json(JSON.parse(data));
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        return res.json({ courses: parsed, deletedCardIds: [] });
+      }
+      return res.json(parsed);
     }
     console.log("[SERVER] No stored curriculum file found, returning empty object (client will fallback to defaults).");
     return res.json(null);
@@ -339,6 +343,7 @@ app.get("/api/curriculum", async (req, res) => {
 app.post("/api/curriculum", async (req, res) => {
   try {
     let courses = req.body?.courses;
+    const deletedCardIds = Array.isArray(req.body?.deletedCardIds) ? req.body.deletedCardIds : [];
     if (!courses && Array.isArray(req.body)) {
       courses = req.body;
     }
@@ -373,8 +378,14 @@ app.post("/api/curriculum", async (req, res) => {
 
     cleanAndPersistBase64Materials(courses);
 
-    await fsPromises.writeFile(CURRICULUM_FILE, JSON.stringify(courses, null, 2), "utf-8");
-    console.log(`[SERVER SUCCESS] Curriculum updated and saved permanently on server (${courses.length} courses).`);
+    const payloadToSave = {
+      courses,
+      deletedCardIds,
+      updatedAt: new Date().toISOString()
+    };
+
+    await fsPromises.writeFile(CURRICULUM_FILE, JSON.stringify(payloadToSave, null, 2), "utf-8");
+    console.log(`[SERVER SUCCESS] Curriculum updated and saved permanently on server (${courses.length} courses, ${deletedCardIds.length} deleted cards tracked).`);
     return res.json({ success: true, message: "Curriculum saved on server" });
   } catch (error: any) {
     console.error("[SERVER ERROR] Failed saving curriculum to disk:", error);

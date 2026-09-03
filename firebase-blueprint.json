@@ -43,6 +43,36 @@
         "visitCount": { "type": "number" }
       },
       "required": ["name", "email"]
+    },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Stores application notifications and announcements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "notifications": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["notifications"]
+    },
+    "feedback": {
+      "title": "Student Feedback",
+      "description": "Stores student feedback and suggestions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "feedback": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["feedback"]
+    },
+    "test": {
+      "title": "Test Connection",
+      "description": "Used to validate connection to Firestore backend",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -57,6 +87,18 @@
     "/student_visitors/{visitorId}": {
       "schema": "student_visitors",
       "description": "Stores student user profile and access directory documents"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "notifications",
+      "description": "Stores broadcast notifications"
+    },
+    "/feedback/{feedbackId}": {
+      "schema": "feedback",
+      "description": "Stores student feedback records"
+    },
+    "/test/{testId}": {
+      "schema": "test",
+      "description": "Test connection endpoint"
     }
   }
 }

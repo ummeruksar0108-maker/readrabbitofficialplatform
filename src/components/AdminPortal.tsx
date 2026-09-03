@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Course, Subject, Semester, Unit, StudyMaterial, AppNotification, StudentFeedback, FeedbackStatus, StudentVisitor } from "../types";
 import { uploadFileToSupabaseStorage, deleteFileFromSupabaseStorage, insertMaterialToSupabaseDB, deleteMaterialFromSupabase, supabase } from "../lib/supabase";
 import { loadStudentVisitorsFromFirestore, deleteStudentVisitorFromFirestore } from "../lib/firebase";
+import { addDeletedCardId } from "../lib/deletedCards";
 import { 
   ShieldCheck, 
   Lock, 
@@ -201,6 +202,7 @@ export default function AdminPortal({
     }
     if (!confirm("Are you sure you want to delete this upload from the curriculum? This cannot be undone.")) return;
 
+    addDeletedCardId(materialId);
     const delRes = await deleteMaterialFromSupabase(materialId, cloudPath);
     if (!delRes.success) {
       alert(`Deletion Failed: ${delRes.message}`);
@@ -611,6 +613,8 @@ export default function AdminPortal({
   const handleDeleteSubject = (subjectId: string, subjectName: string) => {
     if (!window.confirm(`Are you absolutely sure you want to delete "${subjectName}"? This cannot be undone.`)) return;
 
+    addDeletedCardId(subjectId);
+
     const updatedCourses = courses.map(course => {
       if (course.id !== selectedCourseId) return course;
 
@@ -815,6 +819,7 @@ export default function AdminPortal({
     }
     if (!window.confirm("Are you sure you want to delete this PDF file from this unit?")) return;
 
+    addDeletedCardId(materialId);
     const targetUnit = formUnits.find(u => u.id === unitId);
     const targetMat = targetUnit?.materials?.find(m => m.id === materialId);
 
@@ -911,6 +916,19 @@ export default function AdminPortal({
   const handleDeleteSemester = (semId: number, semName: string) => {
     if (!window.confirm(`Are you absolutely sure you want to delete "${semName}"? This will delete all subjects and units within it. This cannot be undone.`)) return;
 
+    const targetCourse = courses.find(c => c.id === selectedCourseId);
+    const targetSem = targetCourse?.semesters.find(s => s.id === semId);
+    if (targetSem) {
+      const deletedIds: string[] = [`sem_${selectedCourseId}_${semId}`];
+      for (const sub of targetSem.subjects || []) {
+        deletedIds.push(sub.id);
+        for (const u of sub.units || []) {
+          deletedIds.push(u.id);
+        }
+      }
+      addDeletedCardId(deletedIds);
+    }
+
     const updatedCourses = courses.map(course => {
       if (course.id !== selectedCourseId) return course;
       return {
@@ -922,7 +940,6 @@ export default function AdminPortal({
     onUpdateCourses(updatedCourses);
 
     // If the currently selected semester is the deleted one, reset it to the first available semester
-    const targetCourse = courses.find(c => c.id === selectedCourseId);
     const remainingSems = targetCourse?.semesters.filter(s => s.id !== semId) || [];
     if (selectedSemesterId === semId) {
       if (remainingSems.length > 0) {

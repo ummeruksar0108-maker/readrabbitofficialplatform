@@ -1,32 +1,53 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeFirestore, getFirestore, doc, setDoc, getDoc, getDocs, collection, deleteDoc, onSnapshot, Firestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { getFirestore, doc, setDoc, getDoc, getDocs, getDocFromServer, collection, deleteDoc, onSnapshot, Firestore } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { uploadFileToSupabaseStorage } from "./supabase";
 import config from "../../firebase-applet-config.json";
 import { StudentVisitor } from "../types";
+import { mergeRemoteDeletedCardIds, getDeletedCardIdsArray } from "./deletedCards";
 
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(config) : getApp();
 
-// Initialize Firestore Database with forced long-polling to ensure stable connectivity in sandboxed/iframe web environments
+// Initialize Firestore Database canonical instance as mandated by Firebase Skill
 const targetDbId = config.firestoreDatabaseId && config.firestoreDatabaseId !== "(default)"
   ? config.firestoreDatabaseId
-  : "(default)";
+  : undefined;
 
-export const db: Firestore = (() => {
+export const db: Firestore = targetDbId
+  ? getFirestore(app, targetDbId)
+  : getFirestore(app);
+
+export const auth = getAuth(app);
+
+// Test Firestore backend connection on boot (as required by Firebase skill)
+async function testConnection() {
   try {
-    return initializeFirestore(
-      app,
-      {
-        experimentalForceLongPolling: true,
-        ignoreUndefinedProperties: true
-      },
-      targetDbId !== "(default)" ? targetDbId : undefined
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Connection check timed out")), 4000)
     );
-  } catch (e) {
-    return targetDbId !== "(default)" ? getFirestore(app, targetDbId) : getFirestore(app);
+    await Promise.race([
+      getDocFromServer(doc(db, "test", "connection")),
+      timeoutPromise
+    ]);
+    logDiagnostic("success", "[Firestore Backend] Connected successfully to Cloud Firestore.");
+  } catch (error: any) {
+    const msg = error?.message || String(error);
+    if (
+      msg.includes("the client is offline") ||
+      msg.includes("Could not reach Cloud Firestore backend") ||
+      msg.includes("timed out") ||
+      error?.code === "unavailable"
+    ) {
+      console.warn("[Firestore Backend] Operating in offline mode or waiting for connection.");
+      logDiagnostic("info", "[Firestore Backend] Client operating in offline mode / local cache.");
+    } else {
+      console.warn("[Firestore Backend Connection Info]", msg);
+    }
   }
-})();
+}
+testConnection();
 
 // Initialize Firebase Storage with explicit bucket URL
 const storageBucketName = config.storageBucket || "solid-aquifer-j5fd2.firebasestorage.app";
@@ -183,16 +204,30 @@ export function handleFirestoreError(error: unknown, operationType: FirestoreOpe
     error: errMsg,
     operationType,
     path,
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
     timestamp: new Date().toISOString()
   };
   console.warn(`[Firestore Error Handler] ${operationType.toUpperCase()} at ${path}:`, errMsg);
   logDiagnostic("warn", `[Firestore ${operationType.toUpperCase()} Error] ${path}: ${errMsg}`);
+  if (errMsg.toLowerCase().includes("permission") || errMsg.toLowerCase().includes("insufficient")) {
+    throw new Error(JSON.stringify(errInfo));
+  }
 }
 
 /**
  * Saves the entire curriculum and materials tree to Firebase Firestore.
  */
-export async function saveCoursesToFirestore(coursesData: any[]): Promise<boolean> {
+export async function saveCoursesToFirestore(coursesData: any[], deletedCardIds?: string[]): Promise<boolean> {
   if (!coursesData || !Array.isArray(coursesData) || coursesData.length === 0) {
     return false;
   }
@@ -205,12 +240,14 @@ export async function saveCoursesToFirestore(coursesData: any[]): Promise<boolea
 
   try {
     const courseDocRef = doc(db, "courses", "main");
-    const payload = {
+    const activeDeletedIds = deletedCardIds || getDeletedCardIdsArray();
+    const payload: any = {
       coursesData: coursesData,
+      deletedCardIds: activeDeletedIds,
       updatedAt: new Date().toISOString()
     };
 
-    const payloadString = JSON.stringify(coursesData);
+    const payloadString = JSON.stringify({ coursesData, deletedCardIds: activeDeletedIds });
     if (payloadString === lastSavedCoursesPayload) {
       // Data hasn't changed, skip duplicate write
       return true;
@@ -266,12 +303,15 @@ export async function loadCoursesFromFirestore(): Promise<any[] | null> {
   logDiagnostic("info", "Loading curriculum from Firestore 'courses/main'...");
   try {
     const courseDocRef = doc(db, "courses", "main");
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000));
     const fetchPromise = (async () => {
       const docSnap = await getDoc(courseDocRef);
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data && Array.isArray(data.coursesData) && data.coursesData.length > 0) {
+          if (Array.isArray(data.deletedCardIds)) {
+            mergeRemoteDeletedCardIds(data.deletedCardIds);
+          }
           updateDiagnostics({
             readStatus: "SUCCESS",
             readSource: "Firestore Direct Fetch",
@@ -386,6 +426,9 @@ export function subscribeCoursesFromFirestore(callback: (coursesData: any[]) => 
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data && Array.isArray(data.coursesData) && data.coursesData.length > 0) {
+          if (Array.isArray(data.deletedCardIds)) {
+            mergeRemoteDeletedCardIds(data.deletedCardIds);
+          }
           updateDiagnostics({
             readStatus: "SUCCESS",
             readSource: "Firestore Cloud Realtime Listener",

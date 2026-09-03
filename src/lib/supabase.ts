@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { logDiagnostic } from "./firebase";
 import { Course, StudyMaterial, Unit } from "../types";
+import { isCardDeleted } from "./deletedCards";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
@@ -467,6 +468,7 @@ export function mergeSupabaseMaterialsIntoCourses(
   // Merge each material from Supabase DB into the appropriate location
   for (const mat of supabaseMaterials) {
     if (!mat.publicUrl) continue;
+    if (mat.id && isCardDeleted(mat.id)) continue;
 
     const matItem: StudyMaterial = {
       id: mat.id || `supa_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,

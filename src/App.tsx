@@ -24,6 +24,7 @@ import FirebaseDiagnosticsPanel from "./components/FirebaseDiagnosticsPanel";
 import { Logo } from "./components/Logo";
 import { logDiagnostic, saveCoursesToFirestore, loadCoursesFromFirestore, subscribeCoursesFromFirestore, saveNotificationsToFirestore, subscribeNotificationsFromFirestore, saveFeedbackToFirestore, subscribeFeedbackFromFirestore, saveStudentVisitorToFirestore } from "./lib/firebase";
 import { supabase, fetchAllMaterialsFromSupabaseDB, mergeSupabaseMaterialsIntoCourses } from "./lib/supabase";
+import { getDeletedCardIds, addDeletedCardId, filterDeletedCards } from "./lib/deletedCards";
 
 // Icons for Responsive Top Bar
 import { Menu, Search, X, Sparkles, Layers, ShieldCheck, Settings, HelpCircle, Bell, BookOpen, RefreshCw, ArrowLeft, LogOut, Palette, Check, MessageSquareHeart } from "lucide-react";
@@ -600,7 +601,7 @@ export default function App() {
       fetch("/api/curriculum", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courses: coursesToSave }),
+        body: JSON.stringify({ courses: coursesToSave, deletedCardIds: getDeletedCardIds() }),
       }).catch((err) => console.warn("[API CURRICULUM POST WARN]", err));
 
       // 2. Dual-save to Firestore Cloud DB for instant cross-device synchronization
@@ -638,8 +639,12 @@ export default function App() {
           const res = await fetch("/api/curriculum?t=" + Date.now(), { cache: "no-store" });
           if (res.ok) {
             const serverData = await res.json();
-            if (serverData && hasAllDefaultCourses(serverData)) {
-              baseCourses = serverData as Course[];
+            if (serverData && Array.isArray(serverData.deletedCardIds)) {
+              addDeletedCardId(serverData.deletedCardIds);
+            }
+            const candidate = serverData?.courses || serverData;
+            if (candidate && hasAllDefaultCourses(candidate)) {
+              baseCourses = candidate as Course[];
               loadedFromCloud = true;
             }
           }
@@ -1184,6 +1189,7 @@ export default function App() {
 
   const handleDeleteSubject = async (subjectId: string): Promise<boolean> => {
     lastLocalMutationTime.current = Date.now();
+    addDeletedCardId(subjectId);
     const nextCourses = courses.map(course => ({
       ...course,
       semesters: course.semesters.map(sem => {
